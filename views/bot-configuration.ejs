@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> - Bot Configuration</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #36393f;
+            --sidebar-bg: #2f3131;
+            --text-color: #dcddde;
+            --accent-color: #7289da;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--sidebar-bg) !important;
+        }
+
+        .card {
+            background-color: var(--sidebar-bg);
+            border: 1px solid #40444b;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .form-control, .form-select {
+            background-color: #40444b;
+            border-color: #40444b;
+            color: var(--text-color);
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: #40444b;
+            border-color: var(--accent-color);
+            color: var(--text-color);
+            box-shadow: 0 0 0 0.2rem rgba(114, 137, 218, 0.25);
+        }
+
+        .role-configs-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #40444b;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #36393f;
+        }
+
+        .role-config-row {
+            background-color: #40444b !important;
+            border: 1px solid #4f545c !important;
+            border-radius: 8px !important;
+            padding: 15px !important;
+            margin-bottom: 15px !important;
+        }
+
+        .role-config-row:last-child {
+            margin-bottom: 0 !important;
+        }
+
+        .role-config-row .form-label {
+            color: var(--text-color);
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .role-config-row .form-control,
+        .role-config-row .form-select {
+            background-color: #36393f;
+            border: 1px solid #4f545c;
+            color: var(--text-color);
+        }
+
+        .role-config-row .form-control:focus,
+        .role-config-row .form-select:focus {
+            background-color: #36393f;
+            border-color: var(--accent-color);
+            color: var(--text-color);
+            box-shadow: 0 0 0 0.2rem rgba(114, 137, 218, 0.25);
+        }
+
+        .preview-text {
+            font-family: 'Courier New', monospace;
+            background-color: #2f3136;
+            padding: 5px 8px;
+            border-radius: 4px;
+            border: 1px solid #4f545c;
+        }
+
+        /* Enhanced notification styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+
+        .notification {
+            background: linear-gradient(135deg, #2f3136, #36393f);
+            border: 1px solid;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-color: #00d26a;
+            background: linear-gradient(135deg, rgba(0, 210, 106, 0.1), rgba(0, 210, 106, 0.05));
+        }
+
+        .notification.error {
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.05));
+        }
+
+        .notification.info {
+            border-color: var(--accent-color);
+            background: linear-gradient(135deg, rgba(114, 137, 218, 0.1), rgba(114, 137, 218, 0.05));
+        }
+
+        .notification.warning {
+            border-color: #ffa500;
+            background: linear-gradient(135deg, rgba(255, 165, 0, 0.1), rgba(255, 165, 0, 0.05));
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .notification.success .notification-icon {
+            color: #00d26a;
+        }
+
+        .notification.error .notification-icon {
+            color: #ff6b6b;
+        }
+
+        .notification.info .notification-icon {
+            color: var(--accent-color);
+        }
+
+        .notification.warning .notification-icon {
+            color: #ffa500;
+        }
+
+        .notification-text {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .notification-message {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.7;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .notification-close:hover {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .notification-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, currentColor, transparent);
+            transition: width 0.1s linear;
+        }
+
+        .notification.success .notification-progress {
+            background: linear-gradient(90deg, transparent, #00d26a, transparent);
+        }
+
+        .notification.error .notification-progress {
+            background: linear-gradient(90deg, transparent, #ff6b6b, transparent);
+        }
+
+        .notification.info .notification-progress {
+            background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+        }
+
+        .notification.warning .notification-progress {
+            background: linear-gradient(90deg, transparent, #ffa500, transparent);
+        }
+
+        /* Button loading state */
+        .btn.loading {
+            position: relative;
+            color: transparent !important;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin-top: -10px;
+            margin-left: -10px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Breadcrumb styles */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .breadcrumb-item {
+            color: #b3b3b3;
+            text-decoration: none;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .breadcrumb-item:hover {
+            color: #7289da;
+        }
+
+        .breadcrumb-separator {
+            color: #666;
+            font-weight: bold;
+        }
+
+        .breadcrumb-current {
+            color: #ffffff;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fab fa-discord"></i> Bot Dashboard
+            </a>
+            <div class="navbar-nav ms-auto">
+                <% if (user) { %>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=128" 
+                                 alt="User Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;">
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/dashboard">მთავარი გვერდი</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout">გასვლა</a></li>
+                        </ul>
+                    </div>
+                <% } else { %>
+                    <a class="nav-link" href="/auth/discord">Login with Discord</a>
+                <% } %>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        
+            <nav class="breadcrumb">
+                <a href="/dashboard" class="breadcrumb-item">
+                    <i class="fas fa-home"></i>
+                    Dashboard
+                </a>
+                <span class="breadcrumb-separator">/</span>
+                <a href="/dashboard/<%= guild.id %>" class="breadcrumb-item">
+                    <%= guild.name %>
+                </a>
+                <span class="breadcrumb-separator">/</span>
+                <span class="breadcrumb-current">
+                    <i class="fas fa-cog"></i>
+                    Bot Configuration
+                </span>
+            </nav>
+                    </div>
+                    <div class="card-body">
+                        <!-- Quick Configuration Settings -->
+                        <div class="row mt-3">
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-signature"></i> Special Nickname</h5>
+                                        <div class="mb-3">
+                                            <label class="form-label">Special Suffix</label>
+                                            <input type="text" class="form-control" id="special-suffix" placeholder="Enter special suffix">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-plus"></i> Role Configuration</h5>
+                                        <button type="button" class="btn btn-success w-100" id="add-role-config">
+                                            <i class="fas fa-plus"></i> Add Role Configuration
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Role Symbol Configuration -->
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5><i class="fas fa-tags"></i> Role Symbol Configuration</h5>
+                                <p class="text-muted mb-3">Configure symbols that appear before usernames and special suffix application for each role</p>
+
+                                <div class="role-configs-container" id="role-settings">
+                                    <!-- Role settings will be populated here -->
+                                </div>
+
+                                <div class="mt-3">
+                                    <button class="btn btn-primary" id="saveRoleConfigBtn">
+                                        <i class="fas fa-save"></i> Save Configuration
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let isPreviewLoading = false;
+        let currentRoleConfigs = []; // Initialize to an empty array
+        let guildRoles = []; // Initialize to an empty array
+
+        // WebSocket connection for real-time updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+        ws.onopen = function() {
+            console.log('WebSocket connected');
+            ws.send(JSON.stringify({
+                type: 'subscribe',
+                guildId: '<%= guild.id %>'
+            }));
+        };
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'audit_log' && data.data.guildId === '<%= guild.id %>') {
+                // You can add code here to update any audit log displays in real-time
+                console.log('New audit log entry:', data.data);
+                // Assuming there's an audit log display area with id="audit-log-entries"
+                const auditLogEntries = document.getElementById('audit-log-entries');
+                if (auditLogEntries) {
+                    const entryElement = document.createElement('div');
+                    // Customize the entryElement based on data.data content
+                    entryElement.innerHTML = `
+                        <div class="audit-log-entry">
+                            <span class="timestamp">${new Date(data.data.timestamp).toLocaleString()}</span>
+                            <span class="executor">${data.data.executor.name}</span>
+                            <span class="action">${data.data.action}</span>
+                            <span class="target">${data.data.target.name || 'N/A'}</span>
+                        </div>
+                    `;
+                    auditLogEntries.prepend(entryElement); // Add to the top
+                }
+            }
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket disconnected');
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        };
+
+
+        function showNotification(type, title, message, duration = 5000) {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+
+            let icon = 'info-circle';
+            if (type === 'success') icon = 'check-circle';
+            else if (type === 'error') icon = 'exclamation-triangle';
+            else if (type === 'warning') icon = 'exclamation-circle';
+            else if (type === 'info') icon = 'info-circle';
+
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <div class="notification-icon">
+                        <i class="fas fa-${icon}"></i>
+                    </div>
+                    <div class="notification-text">
+                        <div class="notification-title">${title}</div>
+                        <div class="notification-message">${message}</div>
+                    </div>
+                    <button class="notification-close" onclick="removeNotification(this.parentElement.parentElement)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notification-progress" style="width: 100%"></div>
+            `;
+
+            container.appendChild(notification);
+
+            // Animate in
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+
+            // Auto-remove after duration (except for errors which stay longer)
+            if (type !== 'error') {
+                const progressBar = notification.querySelector('.notification-progress');
+                let width = 100;
+                const interval = setInterval(() => {
+                    width -= (100 / (duration / 100));
+                    progressBar.style.width = width + '%';
+                    if (width <= 0) {
+                        clearInterval(interval);
+                        removeNotification(notification);
+                    }
+                }, 100);
+            }
+        }
+
+        function removeNotification(notification) {
+            notification.style.transform = 'translateX(100%)';
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 400);
+        }
+
+        function showAlert(type, message) {
+            // Legacy support - convert to new notification system
+            let title = 'Notification';
+            if (type === 'success' || type === 'danger') {
+                title = type === 'success' ? 'Success!' : 'Error!';
+                type = type === 'danger' ? 'error' : type;
+            } else if (type === 'warning') {
+                title = 'Warning!';
+            } else if (type === 'info') {
+                title = 'Information';
+            }
+            showNotification(type, title, message);
+        }
+
+        function loadRoleSettings() {
+            const roleSettingsContainer = document.getElementById('role-settings');
+            if (!roleSettingsContainer) {
+                return;
+            }
+
+            roleSettingsContainer.innerHTML = '';
+
+            // Ensure currentRoleConfigs is an array
+            if (!Array.isArray(currentRoleConfigs)) {
+                currentRoleConfigs = [];
+            }
+
+            if (currentRoleConfigs.length > 0) {
+                // Display saved configurations from database
+                currentRoleConfigs.forEach((config, index) => {
+                    addRoleConfigRow(config, index);
+                });
+            } else {
+                // Show message when no configurations exist
+                roleSettingsContainer.innerHTML = `
+                    <div class="text-center text-muted p-4">
+                        <i class="fas fa-info-circle fa-2x mb-3"></i>
+                        <p>No role configurations found.</p>
+                        <p>Click "Add Role Configuration" to create your first configuration.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function addRoleConfigRow(config = {}, index) {
+            const roleSettingsContainer = document.getElementById('role-settings');
+            if (!roleSettingsContainer) return;
+
+            const row = document.createElement('div');
+            row.className = 'role-config-row';
+            // Ensure that the index is unique for data-index attribute
+            const uniqueIndex = index !== undefined ? index : document.querySelectorAll('.role-config-row').length;
+
+            row.innerHTML = `
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label">Role</label>
+                        <select class="form-select role-select" data-index="${uniqueIndex}">
+                            <option value="">Select Role</option>
+                            ${guildRoles.map(role => 
+                                `<option value="${role.id}" ${config.roleId === role.id ? 'selected' : ''}>${role.name}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Symbol</label>
+                        <input type="text" class="form-control role-symbol" value="${config.symbol || ''}" placeholder="[VI]" maxlength="10">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Apply Special</label>
+                        <select class="form-select role-special">
+                            <option value="false" ${config.applySpecial !== true ? 'selected' : ''}>No</option>
+                            <option value="true" ${config.applySpecial === true ? 'selected' : ''}>Yes</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-danger w-100" onclick="removeRoleConfigRow(this)" title="Remove Configuration">
+                            <i class="fas fa-trash"></i> Remove
+                        </button>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <label class="form-label">Preview:</label>
+                        <div class="preview-text" data-symbol="${config.symbol || ''}" data-special="${config.applySpecial === true}">
+                            ${config.symbol || '[Symbol]'} Username${config.applySpecial === true ? ' ' + (document.getElementById('special-suffix')?.value || '𝓗𝓮𝓷𝓷𝓮𝓼𝓼𝔂') : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            roleSettingsContainer.appendChild(row);
+
+            // Add event listeners for live preview
+            const symbolInput = row.querySelector('.role-symbol');
+            const specialSelect = row.querySelector('.role-special');
+            const previewText = row.querySelector('.preview-text');
+
+            function updatePreview() {
+                const symbol = symbolInput.value || '[Symbol]';
+                const special = specialSelect.value === 'true';
+                const suffix = document.getElementById('special-suffix')?.value || '𝓗𝓮𝓷𝓷𝓮𝓼𝓼𝔂';
+                previewText.textContent = `${symbol} Username${special ? ` ${suffix}` : ''}`;
+
+                // Update the data attributes as well if they are used elsewhere
+                previewText.dataset.symbol = symbol;
+                previewText.dataset.special = special;
+            }
+
+            symbolInput.addEventListener('input', updatePreview);
+            specialSelect.addEventListener('change', updatePreview);
+        }
+
+        function removeRoleConfigRow(button) {
+            button.closest('.role-config-row').remove();
+        }
+
+        function updateAllPreviews() {
+            document.querySelectorAll('.preview-text').forEach(preview => {
+                const row = preview.closest('.role-config-row');
+                const symbolInput = row.querySelector('.role-symbol');
+                const specialSelect = row.querySelector('.role-special');
+                const specialSuffixInput = document.getElementById('special-suffix');
+
+                const symbol = symbolInput.value || '[Symbol]';
+                const special = specialSelect.value === 'true';
+                const suffix = specialSuffixInput.value || '𝓗𝓮𝓷𝓷𝓮𝓼𝓼𝔂';
+                preview.textContent = `${symbol} Username${special ? ` ${suffix}` : ''}`;
+            });
+        }
+
+
+        async function saveRoleConfiguration() {
+            const saveBtn = document.getElementById('saveRoleConfigBtn');
+            const roleConfigs = [];
+            const specialSuffix = document.getElementById('special-suffix')?.value.trim() || '𝓗𝓮𝓷𝓷𝓮𝓼𝓼𝔂';
+
+            document.querySelectorAll('.role-config-row').forEach(row => {
+                const roleId = row.querySelector('.role-select').value;
+                const symbol = row.querySelector('.role-symbol').value.trim();
+                const applySpecial = row.querySelector('.role-special').value === 'true';
+
+                if (roleId) {
+                    roleConfigs.push({ 
+                        roleId, 
+                        symbol: symbol || '', 
+                        applySpecial 
+                    });
+                }
+            });
+
+            try {
+                // Show loading state
+                saveBtn.classList.add('loading');
+                saveBtn.disabled = true;
+
+                showNotification('info', 'Saving...', 'Your configuration is being saved, please wait.');
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/config`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        specialSuffix,
+                        roleConfigs
+                    })
+                });
+
+                const result = await response.json();
+
+                // Remove loading state
+                saveBtn.classList.remove('loading');
+                saveBtn.disabled = false;
+
+                if (response.ok && result.success) {
+                    // Show success notification with details
+                    const configCount = roleConfigs.length;
+                    showNotification('success', 'Configuration Saved!', 
+                        `Successfully saved ${configCount} role configuration${configCount !== 1 ? 's' : ''} and special suffix settings.`, 4000);
+
+                    // Update current configs with the saved data
+                    if (result.config) {
+                        currentRoleConfigs = Array.isArray(result.config.roleConfigs) ? result.config.roleConfigs : [];
+                        console.log('Updated currentRoleConfigs after save:', currentRoleConfigs);
+
+                        // Update displayed values
+                        const specialSuffixInput = document.getElementById('special-suffix');
+                        if (specialSuffixInput) {
+                            specialSuffixInput.value = result.config.specialSuffix;
+                        }
+
+                        const prefixInput = document.getElementById('prefix');
+                        if (prefixInput) {
+                            prefixInput.value = result.config.prefix;
+                        }
+
+                        // Update previews
+                        updateAllPreviews();
+                    }
+
+                    // Brief visual feedback on the button
+                    const originalText = saveBtn.innerHTML;
+                    saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+                    setTimeout(() => {
+                        saveBtn.innerHTML = originalText;
+                    }, 2000);
+                } else {
+                    showNotification('error', 'Save Failed', result.error || 'Failed to save configuration');
+                }
+            } catch (error) {
+                console.error('Error saving role configuration:', error);
+
+                // Remove loading state on error
+                saveBtn.classList.remove('loading');
+                saveBtn.disabled = false;
+
+                showNotification('error', 'Network Error!', 
+                    'Could not connect to the server. Please check your connection and try again.', 8000);
+            }
+        }
+
+        // Add function to load current configuration
+        async function loadCurrentConfiguration() {
+            try {
+                console.log('Loading current configuration...');
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/config`);
+
+                if (!response.ok) {
+                    // If the config doesn't exist yet, handle it gracefully
+                    if (response.status === 404) {
+                        console.log('No configuration found, initializing empty.');
+                        currentRoleConfigs = [];
+                        // Still load guild roles to allow adding new configurations
+                        await loadGuildRoles();
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Configuration loaded:', data.config);
+
+                if (data.success && data.config) {
+                    // Update special suffix input
+                    const specialSuffixInput = document.getElementById('special-suffix');
+                    if (specialSuffixInput) {
+                        specialSuffixInput.value = data.config.specialSuffix || '𝓗𝓮𝓷𝓷𝓮𝓼𝓼𝔂';
+                    }
+
+                    // Update prefix input
+                    const prefixInput = document.getElementById('prefix');
+                    if (prefixInput) {
+                        prefixInput.value = data.config.prefix || '!';
+                    }
+
+                    // Update log channel select
+                    const logChannelSelect = document.getElementById('log-channel');
+                    if (logChannelSelect && data.config.logChannel) {
+                        logChannelSelect.value = data.config.logChannel;
+                    }
+
+                    // Store current role configs - this is the key fix
+                    currentRoleConfigs = Array.isArray(data.config.roleConfigs) ? data.config.roleConfigs : [];
+                    console.log('Loaded role configs:', currentRoleConfigs);
+                } else {
+                    // If data.success is false or config is null/undefined, initialize empty
+                    currentRoleConfigs = [];
+                }
+
+                // Now load the guild roles
+                await loadGuildRoles();
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+                showNotification('error', 'Configuration Load Failed', 'Failed to load saved configuration from database');
+                // Initialize with empty array if loading fails
+                currentRoleConfigs = [];
+                // Still try to load roles
+                await loadGuildRoles();
+            }
+        }
+
+
+        // Load guild roles for dropdowns
+        async function loadGuildRoles() {
+            try {
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/roles`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (response.ok && data.roles) {
+                    guildRoles = data.roles;
+                    loadRoleSettings(); // Load role settings after roles are loaded
+                } else {
+                    showAlert('warning', 'Could not load server roles. Some features may not work properly.');
+                    loadRoleSettings(); // Still load settings even without roles
+                }
+            } catch (error) {
+                showAlert('danger', 'Failed to load server roles: ' + error.message);
+                loadRoleSettings(); // Still load settings even with error
+            }
+        }
+
+        // Initialize everything when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Bot configuration page loaded');
+
+            // Show loading message
+            const roleSettingsContainer = document.getElementById('role-settings');
+            if (roleSettingsContainer) {
+                roleSettingsContainer.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading configuration...</div>';
+            }
+
+            // Load current configuration from server
+            loadCurrentConfiguration();
+
+            // Add event listener for special suffix changes to update previews
+            const specialSuffixInput = document.getElementById('special-suffix');
+            if (specialSuffixInput) {
+                specialSuffixInput.addEventListener('input', () => {
+                    document.querySelectorAll('.preview-text').forEach(preview => {
+                        const row = preview.closest('.role-config-row');
+                        const symbolInput = row.querySelector('.role-symbol');
+                        const specialSelect = row.querySelector('.role-special');
+
+                        const symbol = symbolInput.value || '[Symbol]';
+                        const special = specialSelect.value === 'true';
+                        const suffix = specialSuffixInput.value || '𝓗𝓮𝓷𝓷𝓮𝓼𝓼𝔂';
+                        preview.textContent = `${symbol} Username${special ? ` ${suffix}` : ''}`;
+                    });
+                });
+            }
+
+            const addRoleConfig = document.getElementById('add-role-config');
+            if (addRoleConfig) {
+                addRoleConfig.addEventListener('click', () => {
+                    // Clear the "no configurations" message if it exists
+                    const roleSettingsContainer = document.getElementById('role-settings');
+                    if (roleSettingsContainer && roleSettingsContainer.querySelector('.text-center')) {
+                        roleSettingsContainer.innerHTML = '';
+                    }
+
+                    const index = document.querySelectorAll('.role-config-row').length;
+                    addRoleConfigRow({}, index);
+                });
+            }
+
+            const saveRoleConfigBtn = document.getElementById('saveRoleConfigBtn');
+            if (saveRoleConfigBtn) {
+                saveRoleConfigBtn.addEventListener('click', saveRoleConfiguration);
+            }
+        });
+    </script>
+</body>
+</html>

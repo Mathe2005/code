@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player - <%= guild.name %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #36393f;
+            --sidebar-bg: #2f3131;
+            --text-color: #dcddde;
+            --accent-color: #7289da;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--sidebar-bg) !important;
+        }
+
+        .card {
+            background-color: var(--sidebar-bg);
+            border: 1px solid #40444b;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .form-control, .form-select {
+            background-color: #40444b;
+            border-color: #40444b;
+            color: var(--text-color);
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: #40444b;
+            border-color: var(--accent-color);
+            color: var(--text-color);
+            box-shadow: 0 0 0 0.2rem rgba(114, 137, 218, 0.25);
+        }
+
+        .music-player {
+            background: linear-gradient(135deg, #2f3136, #36393f);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .current-song {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .song-thumbnail {
+            width: 200px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .music-timestamp {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 10px 20px;
+            margin: 20px 0;
+            display: inline-block;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            color: #00d26a;
+            border: 2px solid #00d26a;
+            animation: pulse 2s infinite;
+        }
+
+        .music-timestamp.paused {
+            color: #ffa500;
+            border-color: #ffa500;
+            animation: none;
+        }
+
+        .music-timestamp.stopped {
+            color: #ff6b6b;
+            border-color: #ff6b6b;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 210, 106, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 210, 106, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 210, 106, 0); }
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        .status-dot.playing {
+            background-color: #00d26a;
+        }
+
+        .status-dot.paused {
+            background-color: #ffa500;
+            animation: none;
+        }
+
+        .status-dot.stopped {
+            background-color: #ff6b6b;
+            animation: none;
+        }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .play-btn {
+            background: linear-gradient(45deg, #00d26a, #00b359);
+            border: none;
+            color: white;
+        }
+
+        .queue-item {
+            background-color: #40444b;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .queue-thumbnail {
+            width: 60px;
+            height: 45px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--sidebar-bg);
+            border: 1px solid var(--accent-color);
+            border-radius: 10px;
+            padding: 15px;
+            z-index: 1000;
+            transform: translateX(calc(100% + 20px));
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            visibility: hidden;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .playback-status {
+            margin-top: 5px;
+            font-weight: bold;
+        }
+
+        .playback-status .playing {
+            color: #28a745;
+        }
+
+        .playback-status .paused {
+            color: #dc3545;
+        }
+
+        .music-timestamp {
+            margin-top: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #6c757d;
+            background: rgba(0,0,0,0.1);
+            padding: 5px 10px;
+            border-radius: 15px;
+            display: inline-block;
+        }
+
+        /* Enhanced notification styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+
+        .notification {
+            background: linear-gradient(135deg, #2f3136, #36393f);
+            border: 1px solid;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-color: #00d26a;
+            background: linear-gradient(135deg, rgba(0, 210, 106, 0.1), rgba(0, 210, 106, 0.05));
+        }
+
+        .notification.error {
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.05));
+        }
+
+        .notification.info {
+            border-color: #7289da;
+            background: linear-gradient(135deg, rgba(114, 137, 218, 0.1), rgba(114, 137, 218, 0.05));
+        }
+
+        .notification.warning {
+            border-color: #ffa500;
+            background: linear-gradient(135deg, rgba(255, 165, 0, 0.1), rgba(255, 165, 0, 0.05));
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .notification.success .notification-icon {
+            color: #00d26a;
+        }
+
+        .notification.error .notification-icon {
+            color: #ff6b6b;
+        }
+
+        .notification.info .notification-icon {
+            color: #7289da;
+        }
+
+        .notification.warning .notification-icon {
+            color: #ffa500;
+        }
+
+        .notification-text {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .notification-message {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: #dcddde;
+            opacity: 0.7;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .notification-close:hover {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .notification-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, currentColor, transparent);
+            transition: width 0.1s linear;
+        }
+
+        .notification.success .notification-progress {
+            background: linear-gradient(90deg, transparent, #00d26a, transparent);
+        }
+
+        .notification.error .notification-progress {
+            background: linear-gradient(90deg, transparent, #ff6b6b, transparent);
+        }
+
+        .notification.info .notification-progress {
+            background: linear-gradient(90deg, transparent, #7289da, transparent);
+        }
+
+        .notification.warning .notification-progress {
+            background: linear-gradient(90deg, transparent, #ffa500, transparent);
+        }
+
+        /* Breadcrumb styles */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .breadcrumb-item {
+            color: #b3b3b3;
+            text-decoration: none;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .breadcrumb-item:hover {
+            color: #7289da;
+        }
+
+        .breadcrumb-separator {
+            color: #666;
+            font-weight: bold;
+        }
+
+        .breadcrumb-current {
+            color: #ffffff;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <div class="header-actions">
+            <nav class="breadcrumb">
+                <a href="/dashboard" class="breadcrumb-item">
+                    <i class="fas fa-home"></i>
+                    Dashboard
+                </a>
+                <span class="breadcrumb-separator">/</span>
+                <a href="/dashboard/<%= guild.id %>" class="breadcrumb-item">
+                    <%= guild.name %>
+                </a>
+                <span class="breadcrumb-separator">/</span>
+                <span class="breadcrumb-current">
+                    <i class="fas fa-music"></i>
+                    Music Player
+                </span>
+            </nav></div>
+            <div class="navbar-nav ms-auto">
+                <% if (user) { %>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=128"
+                                 alt="User Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;">
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/dashboard">მთავარი გვერდი</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout">გასვლა</a></li>
+                        </ul>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2><i class="fas fa-music"></i> Music Player</h2>
+
+        <!-- Add Song Section -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5><i class="fas fa-plus"></i> Add Song</h5>
+                <form id="addSongForm">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="voiceChannel" class="form-label">Voice Channel</label>
+                            <select class="form-select" id="voiceChannel" required>
+                                <option value="">Select Voice Channel</option>
+                                <% guild.channels.forEach(channel => { %>
+                                    <option value="<%= channel.id %>"><%= channel.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="songUrl" class="form-label">YouTube URL or Search</label>
+                            <input type="text" class="form-control" id="songUrl" placeholder="https://youtube.com/watch?v=... or song name" required>
+                        </div>
+                        <div class="col-md-2 mb-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Music Player -->
+        <div class="music-player mb-4">
+            <div class="current-song" id="currentSong">
+                <% if (currentSong) { %>
+                    <img src="<%= currentSong.thumbnail %>" alt="Song Thumbnail" class="song-thumbnail" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjNDA0NDRiIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2RjZGRkZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+Cjwvc3ZnPg=='">
+                    <h4><%= currentSong.title %></h4>
+                    <p class="text-muted">Requested by <%= currentSong.requestedBy %></p>
+                    <div class="music-timestamp <% if (!isPlaying) { %>paused<% } %>" id="musicTimestamp">
+                        <i class="fas fa-clock"></i> <span id="currentTime">00:00</span> / <span id="totalTime"><%= currentSong.formattedDuration || formatTime(currentSong.duration) %></span>
+                    </div>
+                    <div class="status-indicator">
+                        <div class="status-dot <% if (isPlaying) { %>playing<% } else { %>paused<% } %>" id="statusDot"></div>
+                        <span id="statusText"><% if (isPlaying) { %>Playing<% } else { %>Paused<% } %></span>
+                    </div>
+                <% } else { %>
+                    <i class="fas fa-music" style="font-size: 100px; opacity: 0.3;"></i>
+                    <h4>No song playing</h4>
+                    <p class="text-muted">Add a song to get started!</p>
+                    <div class="status-indicator">
+                        <div class="status-dot stopped" id="statusDot"></div>
+                        <span id="statusText">Stopped</span>
+                    </div>
+                <% } %>
+            </div>
+
+            <div class="controls">
+                <button class="btn control-btn play-btn" id="playPauseBtn">
+                    <i class="fas fa-play" id="playPauseIcon"></i>
+                </button>
+                <button class="btn control-btn" id="skipBtn" style="background: linear-gradient(45deg, #ff6b6b, #ff5252);">
+                    <i class="fas fa-forward"></i>
+                </button>
+                <button class="btn control-btn" id="stopBtn" style="background: linear-gradient(45deg, #95a5a6, #7f8c8d);">
+                    <i class="fas fa-stop"></i>
+                </button>
+            </div>
+
+            <!-- Volume Control -->
+            <div class="volume-control mt-4 text-center">
+                <label for="volumeSlider" class="form-label">
+                    <i class="fas fa-volume-up"></i> Volume: <span id="volumeDisplay"><%= volume || 50 %>%</span>
+                </label>
+                <div class="d-flex align-items-center justify-content-center gap-3">
+                    <i class="fas fa-volume-down"></i>
+                    <input type="range" class="form-range flex-grow-1" id="volumeSlider"
+                           min="0" max="100" value="<%= volume || 50 %>" style="max-width: 300px;">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Queue Section -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list"></i> Queue</h5>
+                <span class="badge bg-primary" id="queueCount"><%= queue.length %> songs</span>
+            </div>
+            <div class="card-body">
+                <div id="queueContainer">
+                    <% if (queue.length === 0) { %>
+                        <p class="text-muted text-center">No songs in queue</p>
+                    <% } else { %>
+                        <% queue.forEach((song, index) => { %>
+                            <div class="queue-item">
+                                <img src="<%= song.thumbnail %>" alt="Thumbnail" class="queue-thumbnail" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCA2MCA0NSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjNDA0NDRiIi8+Cjx0ZXh0IHg9IjMwIiB5PSIyMi41IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNkY2RkZGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4='">
+                                <div class="flex-grow-1">
+                                    <h6><%= song.title %></h6>
+                                    <small class="text-muted">Requested by <%= song.requestedBy %></small>
+                                </div>
+                                <span class="badge bg-secondary">#<%= index + 1 %></span>
+                            </div>
+                        <% }); %>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // WebSocket connection for real-time updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+        ws.onopen = function() {
+            console.log('WebSocket connected');
+            ws.send(JSON.stringify({
+                type: 'subscribe',
+                guildId: '<%= guild.id %>'
+            }));
+            console.log('Subscribed to guild updates for guild <%= guild.id %>');
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket disconnected');
+        };
+
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('WebSocket message received:', data);
+                if (data.type === 'music_update' && data.data.guildId === '<%= guild.id %>') {
+                    console.log('Processing music update:', data.data);
+                    // Add a small delay to ensure DOM is ready
+                    setTimeout(() => {
+                        updateMusicUI(data.data);
+                    }, 50);
+                }
+            } catch (error) {
+                console.error('WebSocket message error:', error);
+            }
+        };
+
+        // Add song form
+        document.getElementById('addSongForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const channelId = document.getElementById('voiceChannel').value;
+            const url = document.getElementById('songUrl').value;
+
+            if (!channelId || !url) {
+                showNotification('error', 'Error!', 'Please fill in all fields');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/music/play`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, channelId })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('success', 'Success!', 'Song added to queue!');
+                    document.getElementById('songUrl').value = '';
+                    updateQueue();
+                } else {
+                    showNotification('error', 'Error!', result.error || 'Failed to add song');
+                }
+            } catch (error) {
+                showNotification('error', 'Error!', 'Network error');
+            }
+        });
+
+        // Control buttons
+        document.getElementById('playPauseBtn').addEventListener('click', function() {
+            const musicQueue = window.currentMusicState || {};
+
+            if (musicQueue.currentSong) {
+                // Use different endpoints based on current state
+                if (musicQueue.isPlaying) {
+                    controlMusic('pause');
+                } else {
+                    controlMusic('resume');
+                }
+            } else {
+                showNotification('error', 'Error!', 'No song is currently loaded');
+            }
+        });
+        document.getElementById('skipBtn').addEventListener('click', () => controlMusic('skip'));
+        document.getElementById('stopBtn').addEventListener('click', () => controlMusic('stop'));
+
+        // Volume control
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeDisplay = document.getElementById('volumeDisplay');
+
+        if (volumeSlider) {
+            volumeSlider.addEventListener('input', function() {
+                const volume = parseInt(this.value);
+                volumeDisplay.textContent = volume + '%';
+            });
+
+            volumeSlider.addEventListener('change', async function() {
+                const volume = parseInt(this.value);
+                await setVolume(volume);
+            });
+        }
+
+        async function controlMusic(action) {
+            try {
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/music/${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('success', 'Success!', result.message);
+
+                    // Update button states immediately for pause/resume
+                    if (action === 'pause' || action === 'resume') {
+                        // Update global state
+                        if (window.currentMusicState) {
+                            window.currentMusicState.isPlaying = result.isPlaying;
+                        }
+
+                        // Update status indicator
+                        const statusDot = document.getElementById('statusDot');
+                        const statusText = document.getElementById('statusText');
+                        const musicTimestamp = document.getElementById('musicTimestamp');
+
+                        if (statusDot && statusText) {
+                            if (result.isPlaying) {
+                                statusDot.className = 'status-dot playing';
+                                statusText.textContent = 'Playing';
+                                if (musicTimestamp) {
+                                    musicTimestamp.className = 'music-timestamp';
+                                }
+                                startTimestamp(); // Ensure timestamp starts/resumes
+                            } else {
+                                statusDot.className = 'status-dot paused';
+                                statusText.textContent = 'Paused';
+                                if (musicTimestamp) {
+                                    musicTimestamp.className = 'music-timestamp paused';
+                                }
+                                stopTimestamp(); // Ensure timestamp pauses
+                            }
+                        }
+                        updatePlayPauseButton(result.isPlaying);
+                    }
+
+                    if (action === 'stop') {
+                        updateQueue(); // Refresh queue after stop
+                        // Reset UI elements to stopped state
+                        const statusDot = document.getElementById('statusDot');
+                        const statusText = document.getElementById('statusText');
+                        const musicTimestamp = document.getElementById('musicTimestamp');
+                        if(statusDot) statusDot.className = 'status-dot stopped';
+                        if(statusText) statusText.textContent = 'Stopped';
+                        if(musicTimestamp) musicTimestamp.className = 'music-timestamp stopped';
+                        stopTimestamp();
+                        updatePlayPauseButton(false); // Ensure play button is shown
+                        const currentTimeElement = document.getElementById('currentTime');
+                        if(currentTimeElement) currentTimeElement.textContent = '00:00';
+                        const totalTimeElement = document.getElementById('totalTime');
+                        if(totalTimeElement) totalTimeElement.textContent = '0:00';
+                        const songThumbnail = document.querySelector('.song-thumbnail');
+                        if(songThumbnail) songThumbnail.style.display = 'none';
+                        const songTitle = document.querySelector('.current-song h4');
+                        if(songTitle) songTitle.textContent = 'No song playing';
+                        const songRequester = document.querySelector('.current-song p');
+                        if(songRequester) songRequester.textContent = '';
+                    }
+                } else {
+                    showNotification('error', 'Error!', result.error || 'Action failed');
+                }
+            } catch (error) {
+                showNotification('error', 'Error!', 'Network error');
+            }
+        }
+
+        async function setVolume(volume) {
+            try {
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/music/volume`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ volume })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('success', 'Success!', `Volume set to ${volume}%`);
+                } else {
+                    showNotification('error', 'Error!', result.error || 'Failed to set volume');
+                }
+            } catch (error) {
+                showNotification('error', 'Error!', 'Network error');
+            }
+        }
+
+        function updatePlayPauseButton(isPlaying) {
+            const playPauseIcon = document.getElementById('playPauseIcon');
+            const playPauseBtn = document.getElementById('playPauseBtn');
+
+            if (isPlaying) {
+                playPauseIcon.className = 'fas fa-pause';
+                playPauseBtn.style.background = 'linear-gradient(45deg, #ffa500, #ff8c00)';
+            } else {
+                playPauseIcon.className = 'fas fa-play';
+                playPauseBtn.style.background = 'linear-gradient(45deg, #00d26a, #00b359)';
+            }
+        }
+
+        async function updateQueue() {
+            try {
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/music/queue`);
+                const data = await response.json();
+                updateMusicUI(data);
+            } catch (error) {
+                console.error('Error updating queue:', error);
+            }
+        }
+
+        // Timer for music timestamp
+        let timestampInterval = null;
+        let serverPosition = 0; // Position from server in seconds
+        let lastUpdateTime = 0; // Timestamp of the last server data update
+        let currentSongDuration = 0; // Duration of the current song in seconds
+
+        // Helper function to format time
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds < 0) return '0:00';
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateMusicUI(data) {
+            console.log('Updating UI with:', data);
+            // Store current state globally for button logic
+            window.currentMusicState = {
+                isPlaying: data.isPlaying,
+                currentSong: data.currentSong,
+                queue: data.queue,
+                volume: data.volume || 50
+            };
+
+            // Update volume slider if present
+            const volumeSlider = document.getElementById('volumeSlider');
+            const volumeDisplay = document.getElementById('volumeDisplay');
+            if (volumeSlider && data.volume !== undefined) {
+                volumeSlider.value = data.volume;
+                if (volumeDisplay) {
+                    volumeDisplay.textContent = data.volume + '%';
+                }
+            }
+
+            // Clear existing timer
+            if (timestampInterval) {
+                clearInterval(timestampInterval);
+                timestampInterval = null;
+            }
+
+            // Update server position and duration if provided
+            if (data.position !== undefined) {
+                serverPosition = Math.floor(data.position);
+                lastUpdateTime = Date.now();
+            }
+            if (data.duration !== undefined && data.duration > 0) {
+                currentSongDuration = Math.floor(data.duration);
+            } else if (data.currentSong && data.currentSong.duration > 0) {
+                currentSongDuration = Math.floor(data.currentSong.duration);
+            }
+
+            // Update current song display
+            const currentSongDiv = document.getElementById('currentSong');
+            if (data.currentSong) {
+                const thumbnailUrl = data.currentSong.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjNDA0NDRiIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2RjZGRkZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+Cjwvc3ZnPg==';
+                const statusClass = data.isPlaying ? 'playing' : 'paused';
+                const statusText = data.isPlaying ? 'Playing' : 'Paused';
+
+                const formattedDuration = data.formattedDuration || data.currentSong.formattedDuration || formatTime(currentSongDuration);
+
+                currentSongDiv.innerHTML = `
+                    <img src="${thumbnailUrl}" alt="Song Thumbnail" class="song-thumbnail" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjNDA0NDRiIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2RjZGRkZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+Cjwvc3ZnPg=='">
+                    <h4>${data.currentSong.title}</h4>
+                    <p class="text-muted">Requested by ${data.currentSong.requestedBy}</p>
+                    <div class="music-timestamp ${data.isPlaying ? '' : 'paused'}" id="musicTimestamp">
+                        <i class="fas fa-clock"></i> <span id="currentTime">00:00</span> / <span id="totalTime">${formattedDuration}</span>
+                    </div>
+                    <div class="status-indicator">
+                        <div class="status-dot ${statusClass}" id="statusDot"></div>
+                        <span id="statusText">${statusText}</span>
+                    </div>
+                `;
+
+                // Set initial time display and start timer if playing
+                updateTimeDisplay();
+                if (data.isPlaying) {
+                    startTimestamp();
+                }
+            } else {
+                stopTimestamp();
+                currentSongDiv.innerHTML = `
+                    <i class="fas fa-music" style="font-size: 100px; opacity: 0.3;"></i>
+                    <h4>No song playing</h4>
+                    <p class="text-muted">Add a song to get started!</p>
+                    <div class="status-indicator">
+                        <div class="status-dot stopped" id="statusDot"></div>
+                        <span id="statusText">Stopped</span>
+                    </div>
+                `;
+            }
+
+            // Update queue
+            const queueContainer = document.getElementById('queueContainer');
+            const queueCount = document.getElementById('queueCount');
+
+            queueCount.textContent = `${data.queue.length} songs`;
+
+            if (data.queue.length === 0) {
+                queueContainer.innerHTML = '<p class="text-muted text-center">No songs in queue</p>';
+            } else {
+                queueContainer.innerHTML = data.queue.map((song, index) => {
+                    const thumbnailUrl = song.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCA2MCA0NSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjNDA0NDRiIi8+Cjx0ZXh0IHg9IjMwIiB5PSIyMi41IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNkY2RkZGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4=';
+                    return `
+                    <div class="queue-item">
+                        <img src="${thumbnailUrl}" alt="Thumbnail" class="queue-thumbnail" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCA2MCA0NSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjNDA0NDRiIi8+Cjx0ZXh0IHg9IjMwIiB5PSIyMi41IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNkY2RkZGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4='">
+                        <div class="flex-grow-1">
+                            <h6>${song.title}</h6>
+                            <small class="text-muted">Requested by ${song.requestedBy}</small>
+                        </div>
+                        <span class="badge bg-secondary">#${index + 1}</span>
+                    </div>
+                `;
+                }).join('');
+            }
+
+            // Update control buttons based on playing state
+            updatePlayPauseButton(data.isPlaying);
+        }
+
+        function updateTimeDisplay() {
+            const currentTimeElement = document.getElementById('currentTime');
+            if (!currentTimeElement) return;
+
+            // Calculate current position based on server position + elapsed time
+            let currentPosition = serverPosition;
+            if (lastUpdateTime > 0 && window.currentMusicState && window.currentMusicState.isPlaying) {
+                const elapsedSinceUpdate = Math.floor((Date.now() - lastUpdateTime) / 1000);
+                currentPosition += elapsedSinceUpdate;
+            }
+
+            // Clamp to song duration if we have it
+            if (currentSongDuration > 0 && currentPosition > currentSongDuration) {
+                currentPosition = currentSongDuration;
+            }
+
+            currentTimeElement.textContent = formatTime(currentPosition);
+        }
+
+        function startTimestamp() {
+            stopTimestamp(); // Clear any existing interval
+
+            timestampInterval = setInterval(() => {
+                updateTimeDisplay();
+
+                // Check if song has ended
+                let currentPosition = serverPosition;
+                if (lastUpdateTime > 0 && window.currentMusicState && window.currentMusicState.isPlaying) {
+                    const elapsedSinceUpdate = Math.floor((Date.now() - lastUpdateTime) / 1000);
+                    currentPosition += elapsedSinceUpdate;
+                }
+
+                // If we've reached the song duration, fetch fresh data
+                if (currentSongDuration > 0 && currentPosition >= currentSongDuration) {
+                    console.log('Song duration reached, fetching fresh data...');
+                    fetchCurrentPosition();
+                }
+            }, 1000);
+        }
+
+        function stopTimestamp() {
+            if (timestampInterval) {
+                clearInterval(timestampInterval);
+                timestampInterval = null;
+            }
+        }
+
+        // Function to fetch current position from server
+        async function fetchCurrentPosition() {
+            try {
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/music/position`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        serverPosition = data.position || 0;
+                        lastUpdateTime = Date.now();
+                        if (data.duration) {
+                            currentSongDuration = data.duration;
+                        }
+                        updateTimeDisplay(); // Update display immediately
+
+                        // If the song has ended and a new one is available, update UI
+                        if (data.currentSong && window.currentMusicState && window.currentMusicState.currentSong && data.currentSong.id !== window.currentMusicState.currentSong.id) {
+                            console.log('New song detected, updating queue...');
+                            updateQueue();
+                        } else if (!data.isPlaying && window.currentMusicState && window.currentMusicState.isPlaying) {
+                            // If bot stopped playing but was previously playing, update UI
+                            updateQueue();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching position:', error);
+            }
+        }
+
+        function showAlert(type, message) {
+            // Convert legacy alert types to notification types
+            let notificationType = type;
+            let title = 'Notification';
+
+            if (type === 'danger') {
+                notificationType = 'error';
+                title = 'Error!';
+            } else if (type === 'success') {
+                notificationType = 'success';
+                title = 'Success!';
+            } else if (type === 'warning') {
+                notificationType = 'warning';
+                title = 'Warning!';
+            } else if (type === 'info') {
+                notificationType = 'info';
+                title = 'Information';
+            }
+
+            showNotification(notificationType, title, message);
+        }
+
+        function showNotification(type, title, message, duration = 5000) {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+
+            let icon = 'info-circle';
+            if (type === 'success') icon = 'check-circle';
+            else if (type === 'error') icon = 'exclamation-triangle';
+            else if (type === 'warning') icon = 'exclamation-circle';
+            else if (type === 'info') icon = 'info-circle';
+
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <div class="notification-icon">
+                        <i class="fas fa-${icon}"></i>
+                    </div>
+                    <div class="notification-text">
+                        <div class="notification-title">${title}</div>
+                        <div class="notification-message">${message}</div>
+                    </div>
+                    <button class="notification-close" onclick="removeNotification(this.parentElement.parentElement)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notification-progress" style="width: 100%"></div>
+            `;
+
+            container.appendChild(notification);
+
+            // Animate in
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+
+            // Auto-remove after duration (except for errors which stay longer)
+            if (type !== 'error') {
+                const progressBar = notification.querySelector('.notification-progress');
+                let width = 100;
+                const interval = setInterval(() => {
+                    width -= (100 / (duration / 100));
+                    progressBar.style.width = width + '%';
+                    if (width <= 0) {
+                        clearInterval(interval);
+                        removeNotification(notification);
+                    }
+                }, 100);
+            }
+        }
+
+        function removeNotification(notification) {
+            notification.style.transform = 'translateX(100%)';
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 400);
+        }
+
+        // Initialize UI with current state
+        function initializeUI() {
+            // Fetch initial queue data and update the UI
+            updateQueue();
+        }
+
+        // Initial call to populate the UI
+        initializeUI();
+
+        // Periodically sync position with server to prevent drift
+        setInterval(() => {
+            if (window.currentMusicState && window.currentMusicState.currentSong && window.currentMusicState.isPlaying) {
+                fetchCurrentPosition();
+            }
+        }, 10000); // Sync every 10 seconds when playing
+    </script>
+</body>
+</html>

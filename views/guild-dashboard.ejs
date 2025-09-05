@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Bot Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #36393f;
+            --sidebar-bg: #2f3131;
+            --text-color: #dcddde;
+            --accent-color: #7289da;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--sidebar-bg) !important;
+        }
+
+        .sidebar {
+            background-color: var(--sidebar-bg);
+            min-height: calc(100vh - 56px);
+            position: sticky;
+            top: 0;
+            width: 250px;
+            overflow: hidden;
+        }
+
+        .main-content {
+            transition: margin-left 0.3s ease;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .nav-link i {
+            width: 20px;
+            margin-right: 10px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: static;
+                min-height: auto;
+                width: 100% !important;
+            }
+        }
+
+        .card {
+            background-color: var(--sidebar-bg);
+            border: 1px solid #40444b;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .form-control, .form-select {
+            background-color: #40444b;
+            border-color: #40444b;
+            color: var(--text-color);
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: #40444b;
+            border-color: var(--accent-color);
+            color: var(--text-color);
+            box-shadow: 0 0 0 0.2rem rgba(114, 137, 218, 0.25);
+        }
+
+        .table-dark {
+            --bs-table-bg: var(--sidebar-bg);
+        }
+
+        .theme-toggle {
+            cursor: pointer;
+        }
+
+        .role-badge {
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            margin: 2px;
+            position: relative;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 3px;
+            padding: 2px 6px;
+        }
+
+        .remove-role-btn {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            margin-left: 4px;
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: rgba(0,0,0,0.3);
+            border-radius: 2px;
+            font-size: 10px;
+        }
+
+        .role-badge:hover .remove-role-btn {
+            opacity: 1 !important;
+        }
+
+        .add-role-btn {
+            border: 1px dashed #6c757d;
+            color: #6c757d;
+            transition: all 0.2s ease;
+        }
+
+        .add-role-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        .add-role-dropdown {
+            position: absolute;
+            background: var(--sidebar-bg);
+            border: 1px solid #40444b;
+            border-radius: 4px;
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+            min-width: 150px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .add-role-dropdown .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--text-color);
+            transition: background-color 0.2s ease;
+        }
+
+        .add-role-dropdown .dropdown-item:hover {
+            background-color: #40444b;
+        }
+
+        .role-configs-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #40444b;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #36393f;
+        }
+
+        .role-config-row {
+            background-color: #40444b !important;
+            border: 1px solid #4f545c !important;
+            border-radius: 8px !important;
+            padding: 15px !important;
+            margin-bottom: 15px !important;
+        }
+
+        .role-config-row:last-child {
+            margin-bottom: 0 !important;
+        }
+
+        .role-config-row .form-label {
+            color: var(--text-color);
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .role-config-row .form-control,
+        .role-config-row .form-select {
+            background-color: #36393f;
+            border: 1px solid #4f545c;
+            color: var(--text-color);
+        }
+
+        .role-config-row .form-control:focus,
+        .role-config-row .form-select:focus {
+            background-color: #36393f;
+            border-color: var(--accent-color);
+            color: var(--text-color);
+            box-shadow: 0 0 0 0.2rem rgba(114, 137, 218, 0.25);
+        }
+
+        .preview-text {
+            font-family: 'Courier New', monospace;
+            background-color: #2f3136;
+            padding: 5px 8px;
+            border-radius: 4px;
+            border: 1px solid #4f545c;
+        }
+
+        /* Enhanced notification styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+
+        .notification {
+            background: linear-gradient(135deg, #2f3136, #36393f);
+            border: 1px solid;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-color: #00d26a;
+            background: linear-gradient(135deg, rgba(0, 210, 106, 0.1), rgba(0, 210, 106, 0.05));
+        }
+
+        .notification.error {
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.05));
+        }
+
+        .notification.info {
+            border-color: var(--accent-color);
+            background: linear-gradient(135deg, rgba(114, 137, 218, 0.1), rgba(114, 137, 218, 0.05));
+        }
+
+        .notification.warning {
+            border-color: #ffa500;
+            background: linear-gradient(135deg, rgba(255, 165, 0, 0.1), rgba(255, 165, 0, 0.05));
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .notification.success .notification-icon {
+            color: #00d26a;
+        }
+
+        .notification.error .notification-icon {
+            color: #ff6b6b;
+        }
+
+        .notification.info .notification-icon {
+            color: var(--accent-color);
+        }
+
+        .notification.warning .notification-icon {
+            color: #ffa500;
+        }
+
+        .notification-text {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .notification-message {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.7;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .notification-close:hover {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .notification-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, currentColor, transparent);
+            transition: width 0.1s linear;
+        }
+
+        .notification.success .notification-progress {
+            background: linear-gradient(90deg, transparent, #00d26a, transparent);
+        }
+
+        .notification.error .notification-progress {
+            background: linear-gradient(90deg, transparent, #ff6b6b, transparent);
+        }
+
+        .notification.info .notification-progress {
+            background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+        }
+
+        .notification.warning .notification-progress {
+            background: linear-gradient(90deg, transparent, #ffa500, transparent);
+        }
+
+        /* Button loading state */
+        .btn.loading {
+            position: relative;
+            color: transparent !important;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin-top: -10px;
+            margin-left: -10px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fab fa-discord"></i> Bot Dashboard
+            </a>
+            <div class="navbar-nav ms-auto">
+                <% if (user) { %>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="d-flex align-items-center">
+                                <% if (user.avatar) { %>
+                                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %><%= user.avatar.startsWith('a_') ? '.gif' : '.png' %>?size=128" 
+                                         alt="User Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;">
+                                <% } else { %>
+                                    <img src="https://cdn.discordapp.com/embed/avatars/<%= parseInt(user.discriminator) % 5 %>.png" 
+                                         alt="User Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;">
+                                <% } %>
+                            </div>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/dashboard">მთავარი გვერდი</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout">გასვლა</a></li>
+                        </ul>
+                    </div>
+
+                <% } else { %>
+                    <a class="nav-link" href="/auth/discord">Login with Discord</a>
+                <% } %>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <main>
+        <div class="container-fluid mt-4">
+            <div class="row">
+                <div class="col-auto p-0">
+                    <div class="sidebar p-3" id="sidebar">
+                        <h5>
+                            <i class="fas fa-server"></i> <span class="nav-text"><%= guild.name %></span>
+                        </h5>
+                        <hr>
+                        <nav class="nav flex-column">
+                            <a class="nav-link active" href="#overview" data-section="overview">
+                                <i class="fas fa-chart-pie"></i> <span class="nav-text">Overview</span>
+                            </a>
+                            <a class="nav-link" href="#members" data-section="members">
+                                <i class="fas fa-users"></i> <span class="nav-text">Members</span>
+                            </a>
+                            <a class="nav-link" href="#logs" data-section="logs">
+                                <i class="fas fa-clipboard-list"></i> <span class="nav-text">Audit Logs</span>
+                            </a>
+                            <a class="nav-link" href="/dashboard/<%= guild.id %>/music">
+                                <i class="fas fa-music"></i> <span class="nav-text">Music Player</span>
+                            </a>
+                            <a class="nav-link" href="/dashboard/<%= guild.id %>/configuration">
+                                <i class="fas fa-cog"></i> <span class="nav-text">Bot Configuration</span>
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+
+                <div class="col main-content" id="mainContent">
+                    <!-- Overview Section -->
+                    <div id="overview" class="section active">
+                        <h3><i class="fas fa-chart-pie"></i> Server Overview</h3>
+                        <div class="row mt-3">
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-users"></i> Members</h5>
+                                        <h2 class="text-primary"><%= guild.memberCount %></h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-circle text-success"></i> Online</h5>
+                                        <h2 class="text-success"><%= guild.onlineCount %></h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+
+
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5>Quick Settings</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">Command Prefix</label>
+                                    <input type="text" class="form-control" id="prefix" value="<%= config.prefix %>" maxlength="5">
+                                </div>
+                                <button class="btn btn-primary" id="saveOverviewBtn">
+                                    <i class="fas fa-save"></i> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Members Section -->
+                    <div id="members" class="section" style="display: none;">
+                        <h3><i class="fas fa-users"></i> Members Management</h3>
+
+                        <!-- Member filters -->
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control" id="member-search" placeholder="Search members...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="member-role-filter">
+                                            <option value="">All Roles</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="member-sort">
+                                            <option value="newest">Newest First</option>
+                                            <option value="oldest">Oldest First</option>
+                                            <option value="username">Username A-Z</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-primary" id="refresh-members">
+                                            <i class="fas fa-sync-alt"></i> Refresh
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Members list -->
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5><i class="fas fa-users"></i> Server Members</h5>
+                                <span id="member-count" class="badge bg-primary">Loading...</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Member</th>
+                                                <th>Nickname</th>
+                                                <th>Roles</th>
+                                                <th>Joined</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="members-tbody">
+                                            <tr>
+                                                <td colspan="5" class="text-center">
+                                                    <i class="fas fa-spinner fa-spin"></i> Loading members...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination for members -->
+                                <nav aria-label="Members pagination" id="members-pagination-container" style="display: none;">
+                                    <ul class="pagination justify-content-center" id="members-pagination">
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logs Section -->
+                    <div id="logs" class="section" style="display: none;">
+                        <h3><i class="fas fa-clipboard-list"></i> Audit Logs</h3>
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h5><i class="fas fa-clipboard-list"></i> Server Activity Logs</h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- Filters -->
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label for="filter-action" class="form-label">Action</label>
+                                        <select class="form-select" id="filter-action">
+                                            <option value="">All Actions</option>
+                                            <!-- Moderation -->
+                                            <option value="KICK">Kick</option>
+                                            <option value="BAN">Ban</option>
+                                            <option value="MEMBER_UNBAN">Unban</option>
+                                            <option value="TIMEOUT">Timeout</option>
+                                            <option value="TIMEOUT_REMOVE">Timeout Remove</option>
+                                            <option value="WARN">Warn</option>
+                                            <!-- Member -->
+                                            <option value="MEMBER_JOIN">Member Join</option>
+                                            <option value="MEMBER_LEAVE">Member Leave</option>
+                                            <option value="NICKNAME_CHANGE">Nickname Change</option>
+                                            <option value="MEMBER_UPDATE">Member Update</option>
+                                            <!-- Message -->
+                                            <option value="MESSAGE_DELETE">Message Delete</option>
+                                            <option value="MESSAGE_EDIT">Message Edit</option>
+                                            <option value="BULK_DELETE">Bulk Delete</option>
+                                            <option value="MESSAGE_PIN">Message Pin</option>
+                                            <option value="MESSAGE_UNPIN">Message Unpin</option>
+                                            <!-- Channel -->
+                                            <option value="CHANNEL_CREATE">Channel Create</option>
+                                            <option value="CHANNEL_DELETE">Channel Delete</option>
+                                            <option value="CHANNEL_UPDATE">Channel Update</option>
+                                            <option value="LOCK_CHANNEL">Lock Channel</option>
+                                            <option value="UNLOCK_CHANNEL">Unlock Channel</option>
+                                            <option value="CHANNEL_SLOWMODE">Channel Slowmode</option>
+                                            <!-- Role -->
+                                            <option value="ROLE_CREATE">Role Create</option>
+                                            <option value="ROLE_DELETE">Role Delete</option>
+                                            <option value="ROLE_UPDATE">Role Update</option>
+                                            <option value="ROLE_ADD">Role Add</option>
+                                            <option value="ROLE_REMOVE">Role Remove</option>
+                                            <!-- Server -->
+                                            <option value="SERVER_UPDATE">Server Update</option>
+                                            <option value="SERVER_BOOST">Server Boost</option>
+                                            <option value="VOICE_JOIN">Voice Join</option>
+                                            <option value="VOICE_LEAVE">Voice Leave</option>
+                                            <option value="VOICE_MOVE">Voice Move</option>
+                                            <!-- Music -->
+                                            <option value="MUSIC_PLAY">Music Play</option>
+                                            <option value="MUSIC_SKIP">Music Skip</option>
+                                            <option value="MUSIC_STOP">Music Stop</option>
+                                            <option value="MUSIC_VOLUME">Music Volume</option>
+                                            <!-- Config -->
+                                            <option value="BOT_CONFIG_UPDATE">Bot Config Update</option>
+                                            <option value="COMMAND_USED">Command Used</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="filter-category" class="form-label">Category</label>
+                                        <select class="form-select" id="filter-category">
+                                            <option value="">All Categories</option>
+                                            <option value="MODERATION">Moderation</option>
+                                            <option value="MEMBER">Member</option>
+                                            <option value="MESSAGE">Message</option>
+                                            <option value="CHANNEL">Channel</option>
+                                            <option value="ROLE">Role</option>
+                                            <option value="SERVER">Server</option>
+                                            <option value="MUSIC">Music</option>
+                                            <option value="CONFIG">Configuration</option>
+                                            <option value="SYSTEM">System</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="filter-search" class="form-label">Search</label>
+                                        <input type="text" class="form-control" id="filter-search" placeholder="Search logs...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="filter-start-date" class="form-label">Start Date</label>
+                                        <input type="date" class="form-control" id="filter-start-date">
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label for="filter-end-date" class="form-label">End Date</label>
+                                        <input type="date" class="form-control" id="filter-end-date">
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <button class="btn btn-secondary" id="clear-filters">
+                                            <i class="fas fa-times"></i> Clear Filters
+                                        </button>
+                                        <span class="ms-3 text-muted" id="log-count">Showing logs...</span>
+                                        <span class="ms-3" id="live-indicator">
+                                            <i class="fas fa-circle text-success" style="font-size: 8px;"></i>
+                                            <small class="text-success">Live</small>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-striped" id="logsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Category</th>
+                                                <th>Action</th>
+                                                <th>Moderator</th>
+                                                <th>Target</th>
+                                                <th>Reason</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="audit-logs-tbody">
+                                            <tr>
+                                                <td colspan="6" class="text-center">
+                                                    <i class="fas fa-spinner fa-spin"></i> Loading logs...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination -->
+                                <nav aria-label="Audit logs pagination" id="pagination-container" style="display: none;">
+                                    <ul class="pagination justify-content-center" id="pagination">
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // WebSocket connection for real-time updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+        ws.onopen = function() {
+            ws.send(JSON.stringify({
+                type: 'subscribe',
+                guildId: '<%= guild.id %>'
+            }));
+            updateConnectionStatus(true);
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'audit_log' && data.data.guildId === '<%= guild.id %>') {
+                    // Add new log entry to the top of the logs table
+                    addLogEntryToTable(data.data);
+
+                    // If we're on the members section and this is a member-related action, refresh members
+                    const currentSection = document.querySelector('.section.active');
+                    if (currentSection && currentSection.id === 'members') {
+                        if (['ROLE_ADD', 'ROLE_REMOVE', 'NICKNAME_CHANGE', 'MEMBER_JOIN', 'MEMBER_LEAVE'].includes(data.data.action)) {
+                            // Debounced refresh to avoid too many updates
+                            clearTimeout(window.memberRefreshTimeout);
+                            window.memberRefreshTimeout = setTimeout(() => {
+                                loadMembers();
+                            }, 2000);
+                        }
+                    }
+
+                    // Update overview stats if needed (silently)
+                    if (currentSection && currentSection.id === 'overview') {
+                        if (['MEMBER_JOIN', 'MEMBER_LEAVE'].includes(data.data.action)) {
+                            // Could refresh overview stats here if needed
+                        }
+                    }
+                }
+            } catch (error) {
+                // Silently handle WebSocket message errors
+            }
+        };
+
+        ws.onclose = function() {
+            updateConnectionStatus(false);
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        };
+
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('live-indicator');
+            if (indicator) {
+                if (connected) {
+                    indicator.innerHTML = '<i class="fas fa-circle text-success" style="font-size: 8px;"></i> <small class="text-success">Live</small>';
+                } else {
+                    indicator.innerHTML = '<i class="fas fa-circle text-danger" style="font-size: 8px;"></i> <small class="text-danger">Disconnected</small>';
+                }
+            }
+        }
+
+        function addLogEntryToTable(logData) {
+            // Check if the new log entry matches current filters
+            const currentFilters = {
+                action: document.getElementById('filter-action')?.value || '',
+                category: document.getElementById('filter-category')?.value || '',
+                search: document.getElementById('filter-search')?.value || ''
+            };
+
+            // Apply filter logic
+            if (currentFilters.action && logData.action !== currentFilters.action) return;
+            if (currentFilters.category && logData.category !== currentFilters.category) return;
+            if (currentFilters.search) {
+                const searchTerm = currentFilters.search.toLowerCase();
+                const searchableText = [
+                    logData.reason || '',
+                    logData.moderatorTag || '',
+                    logData.targetTag || ''
+                ].join(' ').toLowerCase();
+
+                if (!searchableText.includes(searchTerm)) return;
+            }
+
+            const logsTableBody = document.querySelector('#audit-logs-tbody');
+            if (!logsTableBody) return;
+
+            // If table shows "no logs found" message, clear it first
+            const noLogsRow = logsTableBody.querySelector('tr td[colspan="6"]');
+            if (noLogsRow && noLogsRow.textContent.includes('No logs found')) {
+                logsTableBody.innerHTML = '';
+            }
+
+            const newRow = document.createElement('tr');
+            const timestamp = new Date(logData.timestamp).toLocaleString();
+            const categoryColor = logData.category === 'MODERATION' ? 'danger' : 
+                                 logData.category === 'MEMBER' ? 'info' : 
+                                 logData.category === 'MESSAGE' ? 'warning' : 'secondary';
+
+            newRow.innerHTML = `
+                <td>${timestamp}</td>
+                <td><span class="badge bg-${categoryColor}">${logData.category}</span></td>
+                <td><span class="badge bg-primary">${logData.action}</span></td>
+                <td>${logData.moderatorTag || 'System'}</td>
+                <td>${logData.targetTag || '-'}</td>
+                <td>${logData.reason || '-'}</td>
+            `;
+
+            // Add to the top of the table
+            logsTableBody.insertBefore(newRow, logsTableBody.firstChild);
+
+            // Remove the last row if we have more than 50 rows to keep table manageable
+            const rows = logsTableBody.querySelectorAll('tr');
+            if (rows.length > 50) {
+                logsTableBody.removeChild(rows[rows.length - 1]);
+            }
+
+            // Update log count
+            const logCountElement = document.getElementById('log-count');
+            if (logCountElement) {
+                const currentCount = rows.length;
+                logCountElement.textContent = `Showing ${currentCount} logs (live updated)`;
+            }
+
+            // Add a subtle animation to highlight the new entry
+            newRow.style.backgroundColor = '#7289da';
+            newRow.style.transition = 'background-color 1s ease';
+            setTimeout(() => {
+                newRow.style.backgroundColor = '';
+            }, 1000);
+        }
+
+        // Audit log filtering
+        let currentPage = 1;
+        let currentFilters = {};
+
+        async function loadAuditLogs(page = 1, filters = {}) {
+            try {
+                // Build query parameters
+                const params = new URLSearchParams({
+                    page: page.toString(),
+                    limit: '50' // Increased limit for better view
+                });
+
+                // Add filters to query parameters if they are not empty or default
+                if (filters.action && filters.action !== '') {
+                    params.append('action', filters.action);
+                }
+                if (filters.category && filters.category !== '') {
+                    params.append('category', filters.category);
+                }
+                if (filters.search && filters.search !== '') {
+                    params.append('search', filters.search);
+                }
+                if (filters.dateFrom && filters.dateFrom !== '') {
+                    params.append('startDate', filters.dateFrom);
+                }
+                if (filters.dateTo && filters.dateTo !== '') {
+                    params.append('endDate', filters.dateTo);
+                }
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/logs?${params.toString()}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.logs) {
+                    displayAuditLogs(data.logs);
+                    updatePagination(data.pagination);
+                    const logCountElement = document.getElementById('log-count');
+                    if (logCountElement) {
+                        const totalLogs = data.pagination.totalLogs || 0;
+                        const currentShowing = Math.min(data.logs.length, 50);
+                        logCountElement.textContent = `Showing ${currentShowing} of ${totalLogs} logs`;
+                    }
+                } else {
+                    showNotification('error', 'Error', data.error || 'Failed to load audit logs');
+                    // Clear table if there's an error and no logs are returned
+                    const tbody = document.getElementById('audit-logs-tbody');
+                    if(tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted"><i class="fas fa-exclamation-triangle"></i> Error loading logs.</td></tr>`;
+                }
+            } catch (error) {
+                console.error('Error loading audit logs:', error);
+                showNotification('error', 'Error', 'Failed to load audit logs');
+                const tbody = document.getElementById('audit-logs-tbody');
+                if(tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted"><i class="fas fa-exclamation-triangle"></i> Error loading logs.</td></tr>`;
+            }
+        }
+
+        function displayAuditLogs(logs) {
+            const tbody = document.getElementById('audit-logs-tbody');
+            if (!tbody) {
+                return;
+            }
+
+            tbody.innerHTML = ''; // Clear existing logs
+
+            if (!logs || logs.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="6" class="text-center text-muted">
+                        <i class="fas fa-info-circle"></i> No audit logs found for the selected filters.
+                    </td>
+                `;
+                tbody.appendChild(row);
+                return;
+            }
+
+            logs.forEach(log => {
+                const categoryColor = log.category === 'MODERATION' ? 'danger' : 
+                                     log.category === 'MEMBER' ? 'info' : 
+                                     log.category === 'MESSAGE' ? 'warning' : 'secondary';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td><span class="badge bg-${categoryColor}">${log.category}</span></td>
+                    <td><span class="badge bg-primary">${log.action}</span></td>
+                    <td>${log.moderatorTag || 'System'}</td>
+                    <td>${log.targetTag || '-'}</td>
+                    <td>${log.reason || '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updatePagination(pagination) {
+            const paginationContainer = document.getElementById('pagination-container');
+            const paginationUl = document.getElementById('pagination');
+
+            if (!pagination || pagination.totalPages <= 1) {
+                paginationContainer.style.display = 'none';
+                return;
+            }
+
+            paginationContainer.style.display = 'block';
+            paginationUl.innerHTML = '';
+
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${pagination.currentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" data-page="${pagination.currentPage - 1}">Previous</a>`;
+            paginationUl.appendChild(prevLi);
+
+            // Page numbers
+            const startPage = Math.max(1, pagination.currentPage - 2);
+            const endPage = Math.min(pagination.totalPages, pagination.currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === pagination.currentPage ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+                paginationUl.appendChild(li);
+            }
+
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${pagination.currentPage === pagination.totalPages ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" data-page="${pagination.currentPage + 1}">Next</a>`;
+            paginationUl.appendChild(nextLi);
+        }
+
+        function loadPage(page) {
+            currentPage = page;
+            loadAuditLogs(currentPage, currentFilters);
+        }
+
+        function applyFilters() {
+            const filters = {
+                action: document.getElementById('filter-action').value,
+                category: document.getElementById('filter-category').value,
+                search: document.getElementById('filter-search').value,
+                dateFrom: document.getElementById('filter-start-date').value,
+                dateTo: document.getElementById('filter-end-date').value
+            };
+
+            currentFilters = filters;
+            currentPage = 1; // Reset to first page when filters are applied
+            loadAuditLogs(currentPage, currentFilters);
+        }
+
+        function clearFilters() {
+            document.getElementById('filter-action').value = '';
+            document.getElementById('filter-category').value = '';
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-start-date').value = '';
+            document.getElementById('filter-end-date').value = '';
+
+            currentFilters = {}; // Clear the stored filters
+            currentPage = 1; // Reset to first page
+            loadAuditLogs(currentPage, currentFilters);
+        }
+
+        // Debounce function for search input
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Config form submission
+        async function updateConfig() {
+            const saveBtn = document.getElementById('saveOverviewBtn');
+
+            const config = {};
+
+            // Safely get values from elements that exist
+            const getElementValue = (id, type = 'value') => {
+                const element = document.getElementById(id);
+                if (!element) {
+                    return type === 'checked' ? false : '';
+                }
+                return type === 'checked' ? element.checked : element.value;
+            };
+
+            // Get all configuration values
+            config.prefix = getElementValue('prefix') || '!';
+
+            try {
+                // Show loading state
+                if (saveBtn) {
+                    saveBtn.classList.add('loading');
+                    saveBtn.disabled = true;
+                }
+
+                showNotification('info', 'Saving...', 'Your settings are being saved, please wait.');
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+
+                // Remove loading state
+                if (saveBtn) {
+                    saveBtn.classList.remove('loading');
+                    saveBtn.disabled = false;
+                }
+
+                if (response.ok && result.success) {
+                    showNotification('success', 'Settings Saved!', 'Your configuration has been updated successfully.', 4000);
+
+                    // Brief visual feedback on the button
+                    if (saveBtn) {
+                        const originalText = saveBtn.innerHTML;
+                        saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+                        setTimeout(() => {
+                            saveBtn.innerHTML = originalText;
+                        }, 2000);
+                    }
+                } else {
+                    showNotification('error', 'Save Failed', result.error || 'Failed to save configuration');
+                }
+            } catch (error) {
+                console.error('Failed to update config:', error);
+
+                // Remove loading state on error
+                if (saveBtn) {
+                    saveBtn.classList.remove('loading');
+                    saveBtn.disabled = false;
+                }
+
+                showNotification('error', 'Network Error!', 'Could not connect to the server. Please check your connection and try again.', 8000);
+            }
+        }
+
+        function showNotification(type, title, message, duration = 5000) {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+
+            let icon = 'info-circle';
+            if (type === 'success') icon = 'check-circle';
+            else if (type === 'error') icon = 'exclamation-triangle';
+            else if (type === 'warning') icon = 'exclamation-circle';
+            else if (type === 'info') icon = 'info-circle';
+
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <div class="notification-icon">
+                        <i class="fas fa-${icon}"></i>
+                    </div>
+                    <div class="notification-text">
+                        <div class="notification-title">${title}</div>
+                        <div class="notification-message">${message}</div>
+                    </div>
+                    <button class="notification-close" onclick="removeNotification(this.parentElement.parentElement)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notification-progress" style="width: 100%"></div>
+            `;
+
+            container.appendChild(notification);
+
+            // Animate in
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+
+            // Auto-remove after duration (except for errors which stay longer)
+            if (type !== 'error') {
+                const progressBar = notification.querySelector('.notification-progress');
+                let width = 100;
+                const interval = setInterval(() => {
+                    width -= (100 / (duration / 100));
+                    progressBar.style.width = width + '%';
+                    if (width <= 0) {
+                        clearInterval(interval);
+                        removeNotification(notification);
+                    }
+                }, 100);
+            }
+        }
+
+        function removeNotification(notification) {
+            notification.style.transform = 'translateX(100%)';
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 400);
+        }
+
+        function showAlert(type, message) {
+            // Legacy support - convert to new notification system
+            let title = 'Notification';
+            if (type === 'success' || type === 'danger') {
+                title = type === 'success' ? 'Success!' : 'Error!';
+                type = type === 'danger' ? 'error' : type;
+            } else if (type === 'warning') {
+                title = 'Warning!';
+            } else if (type === 'info') {
+                title = 'Information';
+            }
+            showNotification(type, title, message);
+        }
+
+        // Sidebar navigation functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sidebar navigation functionality
+            const navLinks = document.querySelectorAll('.sidebar .nav-link');
+            const sections = document.querySelectorAll('.section');
+
+            function showSection(sectionName) {
+                // Remove active class from all nav links
+                navLinks.forEach(nl => nl.classList.remove('active'));
+
+                // Hide all sections
+                sections.forEach(section => {
+                    section.style.display = 'none';
+                    section.classList.remove('active');
+                });
+
+                // Show the target section
+                const targetElement = document.getElementById(sectionName);
+                const targetNavLink = document.querySelector(`[data-section="${sectionName}"]`);
+
+                if (targetElement && targetNavLink) {
+                    targetElement.style.display = 'block';
+                    targetElement.classList.add('active');
+                    targetNavLink.classList.add('active');
+
+                    // Save current section to localStorage
+                    localStorage.setItem('currentSection', sectionName);
+
+                    // Update URL fragment
+                    window.history.replaceState(null, null, `#${sectionName}`);
+
+                    // Load section-specific data
+                    if (sectionName === 'members') {
+                        loadMembers();
+                    } else if (sectionName === 'logs') {
+                        // Load logs with current filters when switching to logs section
+                        loadAuditLogs(currentPage, currentFilters);
+                    }
+
+                    // Scroll to top of main content
+                    const mainContent = document.getElementById('mainContent');
+                    if (mainContent) {
+                        mainContent.scrollTop = 0;
+                    }
+                }
+            }
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    // Don't prevent default for external links (like bot configuration)
+                    if (this.getAttribute('href').startsWith('/dashboard/')) {
+                        return; // Allow normal navigation
+                    }
+
+                    e.preventDefault();
+                    const targetSection = this.getAttribute('data-section');
+                    if (targetSection) {
+                        showSection(targetSection);
+                    }
+                });
+            });
+
+            // Check for saved section or URL fragment on page load
+            const urlFragment = window.location.hash.substr(1);
+            const savedSection = localStorage.getItem('currentSection');
+            const initialSection = urlFragment || savedSection || 'overview';
+
+            showSection(initialSection);
+
+            // Initialize data loading
+            loadGuildRoles();
+
+            // Add event listeners for member management
+            const memberSearch = document.getElementById('member-search');
+            if (memberSearch) {
+                memberSearch.addEventListener('input', debounce(() => {
+                    currentMembersPage = 1;
+                    loadMembers();
+                }, 500));
+            }
+
+            const memberRoleFilter = document.getElementById('member-role-filter');
+            if (memberRoleFilter) {
+                memberRoleFilter.addEventListener('change', () => {
+                    currentMembersPage = 1;
+                    loadMembers();
+                });
+            }
+
+            const memberSort = document.getElementById('member-sort');
+            if (memberSort) {
+                memberSort.addEventListener('change', () => {
+                    currentMembersPage = 1;
+                    loadMembers();
+                });
+            }
+
+            const refreshMembers = document.getElementById('refresh-members');
+            if (refreshMembers) {
+                refreshMembers.addEventListener('click', loadMembers);
+            }
+        });
+
+        // Members management functionality
+        let currentMembersPage = 1;
+        let totalMembersPages = 1;
+        let currentMembers = [];
+
+        async function loadMembers() {
+            try {
+                const search = document.getElementById('member-search')?.value || '';
+                const roleFilter = document.getElementById('member-role-filter')?.value || '';
+                const sort = document.getElementById('member-sort')?.value || 'newest';
+
+                const params = new URLSearchParams({
+                    page: currentMembersPage,
+                    search,
+                    role: roleFilter,
+                    sort
+                });
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/members?${params}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentMembers = data.members;
+                    updateMembersTable(data.members);
+                    updateMembersPagination(data.pagination);
+
+                    const memberCount = document.getElementById('member-count');
+                    if (memberCount) {
+                        memberCount.textContent = `${data.pagination.total} members`;
+                    }
+                } else {
+                    showAlert('danger', 'Failed to load members: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error loading members:', error);
+                showAlert('danger', 'Failed to load members');
+            }
+        }
+
+        function updateMembersTable(members) {
+            const tbody = document.getElementById('members-tbody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (!members || members.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">
+                            <i class="fas fa-info-circle"></i> No members found.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            members.forEach(member => {
+                const row = document.createElement('tr');
+
+                const rolesBadges = member.roles.map(role => 
+                    `<span class="badge me-1" style="background-color: ${role.color || '#6c757d'}">${role.name}</span>`
+                ).join('');
+
+                const roleOptions = guildRoles.map(role => 
+                    `<option value="${role.id}" ${member.roles.find(r => r.id === role.id) ? 'selected' : ''}>${role.name}</option>`
+                ).join('');
+
+                row.innerHTML = `
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="${member.avatar}" alt="Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;">
+                            <div>
+                                <div>${member.username}</div>
+                                <small class="text-muted">${member.tag}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="nickname-display">${member.nickname || 'None'}</span>
+                            <button class="btn btn-sm btn-outline-light" onclick="editNickname('${member.id}')" title="Edit nickname">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="roles-container d-flex flex-wrap">
+                            ${member.roles.map(role => {
+                                const roleColor = role.color && role.color !== '#000000' ? role.color : '#99aab5';
+                                return `<span class="role-badge" style="background-color: ${roleColor}; color: ${roleColor === '#99aab5' ? '#2e3338' : '#ffffff'}">
+                                    ${role.name}
+                                    <span class="remove-role-btn" onclick="removeRole('${member.id}', '${role.id}', this)" title="Remove role">
+                                        <i class="fas fa-times"></i>
+                                    </span>
+                                </span>`;
+                            }).join('')}
+                            <button class="btn btn-sm btn-outline-light add-role-btn" onclick="showAddRoleDropdown('${member.id}', this)" title="Add role" style="padding: 2px 6px; font-size: 12px; margin: 2px;">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td>${member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : 'Unknown'}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-info" onclick="viewMemberDetails('${member.id}')">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateMembersPagination(pagination) {
+            const container = document.getElementById('members-pagination-container');
+            const ul = document.getElementById('members-pagination');
+
+            if (pagination.total <= 1) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            ul.innerHTML = '';
+
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${pagination.current === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="changeMembersPage(${pagination.current - 1})">Previous</a>`;
+            ul.appendChild(prevLi);
+
+            // Page numbers
+            const startPage = Math.max(1, pagination.current - 2);
+            const endPage = Math.min(pagination.total, pagination.current + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === pagination.current ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#" onclick="changeMembersPage(${i})">${i}</a>`;
+                ul.appendChild(li);
+            }
+
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${pagination.current === pagination.total ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="changeMembersPage(${pagination.current + 1})">Next</a>`;
+            ul.appendChild(nextLi);
+
+            totalMembersPages = pagination.total;
+        }
+
+        function changeMembersPage(page) {
+            if (page >= 1 && page <= totalMembersPages) {
+                currentMembersPage = page;
+                loadMembers();
+            }
+        }
+
+        async function editNickname(memberId) {
+            const member = currentMembers.find(m => m.id === memberId);
+            if (!member) return;
+
+            const currentNickname = member.nickname || '';
+            const newNickname = prompt('Enter new nickname:', currentNickname);
+
+            if (newNickname === null || newNickname === currentNickname) {
+                return; // User cancelled or entered the same nickname
+            }
+
+            try {
+                showNotification('info', 'Updating Nickname...', 'Please wait while we update the nickname.');
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${memberId}/nickname`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nickname: newNickname })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('success', 'Nickname Updated!', `Successfully changed nickname to "${newNickname || 'None'}"`, 4000);
+                    setTimeout(() => loadMembers(), 1000); // Refresh members list
+                } else {
+                    showNotification('error', 'Update Failed', result.error || 'Failed to update nickname');
+                }
+            } catch (error) {
+                console.error('Error editing nickname:', error);
+                showNotification('error', 'Network Error', 'Failed to update nickname due to connection issues');
+            }
+        }
+
+        async function toggleMemberRole(memberId, roleId, selectElement) {
+            if (!roleId) return;
+
+            try {
+                const member = currentMembers.find(m => m.id === memberId);
+                const hasRole = member?.roles.find(r => r.id === roleId);
+                const action = hasRole ? 'remove' : 'add';
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${memberId}/role`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roleId, action })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('success', result.message);
+                    selectElement.value = ''; // Reset dropdown
+                    setTimeout(() => loadMembers(), 1000); // Refresh members list
+                } else {
+                    showAlert('danger', result.error);
+                }
+            } catch (error) {
+                console.error('Error toggling role:', error);
+                showAlert('danger', 'Failed to toggle role');
+            }
+        }
+
+        async function removeRole(memberId, roleId, buttonElement) {
+            try {
+                showNotification('info', 'Removing Role...', 'Please wait while we remove the role.');
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${memberId}/role`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roleId, action: 'remove' })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('success', 'Role Removed!', 'The role has been successfully removed from the member.', 3000);
+                    setTimeout(() => loadMembers(), 1000);
+                } else {
+                    showNotification('error', 'Remove Failed', result.error || 'Failed to remove role');
+                }
+            } catch (error) {
+                console.error('Error removing role:', error);
+                showNotification('error', 'Network Error', 'Failed to remove role due to connection issues');
+            }
+        }
+
+        function showAddRoleDropdown(memberId, buttonElement) {
+            // Remove any existing dropdowns
+            document.querySelectorAll('.add-role-dropdown').forEach(dropdown => dropdown.remove());
+
+            const member = currentMembers.find(m => m.id === memberId);
+            if (!member) return;
+
+            const memberRoleIds = member.roles.map(r => r.id);
+            const availableRoles = guildRoles.filter(role => !memberRoleIds.includes(role.id));
+
+            if (availableRoles.length === 0) {
+                showAlert('info', 'No additional roles available for this member');
+                return;
+            }
+
+            const dropdown = document.createElement('div');
+            dropdown.className = 'add-role-dropdown';
+            dropdown.style.position = 'absolute';
+            dropdown.style.top = buttonElement.offsetTop + buttonElement.offsetHeight + 'px';
+            dropdown.style.left = buttonElement.offsetLeft + 'px';
+
+            availableRoles.forEach(role => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                const roleColor = role.color && role.color !== '#000000' ? role.color : '#99aab5';
+                item.innerHTML = `<span class="role-badge" style="background-color: ${roleColor}; color: ${roleColor === '#99aab5' ? '#2e3338' : '#ffffff'}; margin: 0; padding: 2px 6px;">${role.name}</span>`;
+                item.onclick = () => addRole(memberId, role.id, dropdown);
+                dropdown.appendChild(item);
+            });
+
+            // Close dropdown when clicking outside
+            const closeDropdown = (e) => {
+                if (!dropdown.contains(e.target) && e.target !== buttonElement) {
+                    dropdown.remove();
+                    document.removeEventListener('click', closeDropdown);
+                }
+            };
+
+            setTimeout(() => {
+                document.addEventListener('click', closeDropdown);
+            }, 100);
+
+            buttonElement.parentElement.style.position = 'relative';
+            buttonElement.parentElement.appendChild(dropdown);
+        }
+
+        async function addRole(memberId, roleId, dropdown) {
+            try {
+                showNotification('info', 'Adding Role...', 'Please wait while we add the role to the member.');
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${memberId}/role`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roleId, action: 'add' })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('success', 'Role Added!', 'The role has been successfully added to the member.', 3000);
+                    dropdown.remove();
+                    setTimeout(() => loadMembers(), 1000);
+                } else {
+                    showNotification('error', 'Add Failed', result.error || 'Failed to add role');
+                }
+            } catch (error) {
+                console.error('Error adding role:', error);
+                showNotification('error', 'Network Error', 'Failed to add role due to connection issues');
+            }
+        }
+
+        function viewMemberDetails(memberId) {
+            const member = currentMembers.find(m => m.id === memberId);
+            if (member) {
+                alert(`Member Details:\nUsername: ${member.username}\nTag: ${member.tag}\nNickname: ${member.nickname || 'None'}\nRoles: ${member.roles.map(r => r.name).join(', ')}`);
+            }
+        }
+
+        // Role configuration functionality
+        let guildRoles = [];
+
+        // Load guild roles for dropdowns
+        async function loadGuildRoles() {
+            try {
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/roles`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    guildRoles = data.roles;
+
+                    // Update role filter dropdown
+                    const roleFilter = document.getElementById('member-role-filter');
+                    if (roleFilter) {
+                        roleFilter.innerHTML = '<option value="">All Roles</option>' +
+                            guildRoles.map(role => `<option value="${role.id}">${role.name}</option>`).join('');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading guild roles:', error);
+            }
+        }
+
+        // General configuration save function
+        async function saveGeneralConfig() {
+            const logChannel = document.getElementById('log-channel')?.value || null;
+
+            try {
+                const response = await fetch(`/dashboard/<%= guild.id %>/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ logChannel })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('success', 'General settings saved successfully!');
+                } else {
+                    showAlert('danger', 'Failed to save settings: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving general configuration:', error);
+                showAlert('danger', 'Failed to save settings');
+            }
+        }
+
+        // Add event listeners for the save buttons - with null checks
+        const saveButtons = [
+            'saveOverviewBtn',
+            'saveGeneralConfigBtn' // Assuming there's a button with this ID elsewhere for general config
+        ];
+
+        saveButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                if (buttonId === 'saveGeneralConfigBtn') {
+                    button.addEventListener('click', saveGeneralConfig);
+                } else {
+                    button.addEventListener('click', updateConfig);
+                }
+            }
+        });
+
+        // Add event listeners for filter functionality - with null checks
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterElements = [
+                { id: 'filter-action', event: 'change', handler: () => { currentPage = 1; applyFilters(); } },
+                { id: 'filter-category', event: 'change', handler: () => { currentPage = 1; applyFilters(); } },
+                { id: 'filter-search', event: 'input', handler: debounce(() => { currentPage = 1; applyFilters(); }, 500) },
+                { id: 'filter-start-date', event: 'change', handler: () => { currentPage = 1; applyFilters(); } },
+                { id: 'filter-end-date', event: 'change', handler: () => { currentPage = 1; applyFilters(); } }
+            ];
+
+            filterElements.forEach(({ id, event, handler }) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener(event, handler);
+                }
+            });
+
+            const clearFiltersButton = document.getElementById('clear-filters');
+            if (clearFiltersButton) {
+                clearFiltersButton.addEventListener('click', clearFilters);
+            }
+        });
+
+        // Pagination click handler - with null check
+        const paginationElement = document.getElementById('pagination');
+        if (paginationElement) {
+            paginationElement.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (e.target.tagName === 'A' && e.target.dataset.page) {
+                    const page = parseInt(e.target.dataset.page);
+                    if (!isNaN(page)) {
+                        loadPage(page);
+                    }
+                }
+            });
+        }
+
+        // Initial load of logs when the page loads and the logs section is active
+        document.addEventListener('DOMContentLoaded', function() {
+            const logsSection = document.getElementById('logs');
+            if (logsSection && logsSection.classList.contains('active')) {
+                loadAuditLogs(currentPage, currentFilters);
+            }
+        });
+
+    </script>
+</body>
+</html>
