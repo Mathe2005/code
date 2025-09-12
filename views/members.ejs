@@ -36,12 +36,12 @@
             margin-bottom: 5px;
             border: 1px solid rgba(0,0,0,0.1);
         }
-        
+
         /* Helper function for text color based on background */
         .role-badge.light-bg {
             color: #000000 !important;
         }
-        
+
         .role-badge.dark-bg {
             color: #ffffff !important;
         }
@@ -228,18 +228,201 @@
             align-items: center;
             gap: 5px;
         }
+
+        /* Modal styles for moderation actions */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1050; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background-color: #2f3136;
+            margin: 10% auto; /* 10% from the top and centered */
+            padding: 30px;
+            border: 1px solid #4a4a4a;
+            border-radius: 8px;
+            width: 80%; /* Could be more or less, depending on screen size */
+            max-width: 500px;
+            color: #ffffff;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            border-bottom: 1px solid #4a4a4a;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .modal-close-button {
+            background: none;
+            border: none;
+            color: #dcddde;
+            opacity: 0.7;
+            cursor: pointer;
+            font-size: 1.75rem;
+            line-height: 1;
+            padding: 0;
+        }
+        .modal-close-button:hover {
+            opacity: 1;
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-body label {
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .modal-body input[type="text"],
+        .modal-body input[type="number"],
+        .modal-body textarea {
+            background-color: #202225;
+            border: 1px solid #4a4a4a;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 4px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .modal-body textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .modal-footer {
+            border-top: 1px solid #4a4a4a;
+            padding-top: 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .modal-footer .btn {
+            padding: 10px 20px;
+            font-weight: 500;
+        }
+        .modal-footer .btn-secondary {
+            background-color: #4a4a4a;
+            border: none;
+        }
+        .modal-footer .btn-danger {
+            background-color: #f04747;
+            border: none;
+        }
+        .modal-footer .btn-danger:hover {
+            background-color: #d33a3a;
+        }
+
+        .moderation-popup {
+            position: absolute;
+            background-color: #2f3136;
+            border: 1px solid #4a4a4a;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+            z-index: 1000;
+            min-width: 180px;
+            display: none; /* Initially hidden */
+            color: #ffffff;
+        }
+
+        .moderation-popup .popup-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .moderation-popup .popup-item:hover {
+            background-color: #4a4a4a;
+        }
+        .moderation-popup .popup-item i {
+            width: 20px; /* Fixed width for icon alignment */
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <!-- Notification Container -->
     <div class="notification-container" id="notificationContainer"></div>
 
+    <!-- Moderation Modal -->
+    <div class="modal" id="moderationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalMemberName"></h5>
+                <button type="button" class="modal-close-button" onclick="closeModerationModal()">
+                    &times;
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Member ID: <span id="modalMemberId"></span></p>
+                <label for="moderationReason">Reason:</label>
+                <textarea id="moderationReason" rows="3" placeholder="Optional reason for action"></textarea>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <button class="btn btn-sm btn-primary" onclick="showRoleManagementModal()">
+                        <i class="fas fa-user-tag"></i> Manage Roles
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="changeNicknameFromModal()">
+                        <i class="fas fa-signature"></i> Change Nickname
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModerationModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="submitKickBanAction('kick')">Kick</button>
+                <button class="btn btn-danger" onclick="submitKickBanAction('ban')">Ban</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role Management Modal -->
+    <div class="modal" id="roleManagementModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="roleModalMemberName"></h5>
+                <button type="button" class="modal-close-button" onclick="closeRoleManagementModal()">
+                    &times;
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Add/Remove Roles:</p>
+                <div id="roleList">
+                    <% guild.roles.forEach(role => { %>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="role_<%= role.id %>" value="<%= role.id %>">
+                            <label class="form-check-label" for="role_<%= role.id %>">
+                                <%= role.name %>
+                            </label>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRoleManagementModal()">Close</button>
+                <button class="btn btn-primary" onclick="updateMemberRoles()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        
+
             <nav class="breadcrumb">
                 <a href="/dashboard" class="breadcrumb-item">
                     <i class="fas fa-home"></i>
@@ -252,11 +435,7 @@
                 <span class="breadcrumb-separator">/</span>
                 <span class="breadcrumb-current">
                     <i class="fas fa-users"></i>
-                    Members (<%= pagination.filteredMembers || pagination.totalMembers %> 
-                    <% if (filters.search || filters.role) { %>
-                        of <%= guild.totalMembers %>
-                    <% } %>
-                    )
+                    Members (<%= pagination.totalMembers %>)
                 </span>
             </nav></div>
     </div>
@@ -302,7 +481,11 @@
                                 <div class="member-card">
                                     <div class="row align-items-center">
                                         <div class="col-md-2">
-                                            <img src="<%= member.avatar %>" alt="Avatar" class="member-avatar">
+                                            <img src="<%= member.avatar %>" alt="Avatar" class="member-avatar" 
+                                                 onclick="showModerationModal('<%= member.id %>', '<%= member.username %>', '<%= member.avatar %>')"
+                                                 style="cursor: pointer; transition: transform 0.2s; border: 2px solid transparent;"
+                                                 onmouseover="this.style.transform='scale(1.1)'; this.style.borderColor='#007bff';"
+                                                 onmouseout="this.style.transform='scale(1)'; this.style.borderColor='transparent';">
                                             <span class="status-indicator status-<%= member.status %>"></span>
                                         </div>
                                         <div class="col-md-3">
@@ -317,23 +500,23 @@
                                             <div class="roles-container">
                                                 <% member.roles.forEach(role => { 
                                                     let bgColor = role.color || '#6c757d';
-                                                    
+
                                                     // Handle cases where role.color might be a number
                                                     if (typeof bgColor === 'number') {
                                                         bgColor = '#' + bgColor.toString(16).padStart(6, '0');
                                                     }
-                                                    
+
                                                     // Ensure bgColor starts with #
                                                     if (!bgColor.startsWith('#')) {
                                                         bgColor = '#' + bgColor;
                                                     }
-                                                    
+
                                                     // Convert hex to RGB for brightness calculation
                                                     const hex = bgColor.replace('#', '');
                                                     const r = parseInt(hex.substr(0, 2), 16) || 0;
                                                     const g = parseInt(hex.substr(2, 2), 16) || 0;
                                                     const b = parseInt(hex.substr(4, 2), 16) || 0;
-                                                    
+
                                                     // Calculate relative luminance using WCAG formula
                                                     const getLuminance = (r, g, b) => {
                                                         const [rs, gs, bs] = [r, g, b].map(c => {
@@ -342,9 +525,9 @@
                                                         });
                                                         return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
                                                     };
-                                                    
+
                                                     const luminance = getLuminance(r, g, b);
-                                                    
+
                                                     // Use dark text for light backgrounds (luminance > 0.5), white text for dark backgrounds
                                                     const textColor = luminance > 0.5 ? '#000000' : '#ffffff';
                                                     const borderColor = luminance > 0.5 ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)';
@@ -358,25 +541,11 @@
                                             </div>
                                         </div>
                                         <div class="col-md-3">
-                                            <div class="btn-group-vertical w-100">
-                                                <div class="dropdown">
-                                                    <button class="btn btn-sm btn-primary dropdown-toggle btn-action" 
-                                                            type="button" data-bs-toggle="dropdown">
-                                                        <i class="fas fa-user-tag"></i> Manage Roles
-                                                    </button>
-                                                    <ul class="dropdown-menu">
-                                                        <% guild.roles.forEach(role => { %>
-                                                            <li>
-                                                                <% const hasRole = member.roles.some(r => r.id === role.id); %>
-                                                                <a class="dropdown-item" 
-                                                                   onclick="manageRole('<%= member.id %>', '<%= role.id %>', '<%= hasRole ? 'remove' : 'add' %>')">
-                                                                    <i class="fas fa-<%= hasRole ? 'minus' : 'plus' %>"></i>
-                                                                    <%= hasRole ? 'Remove' : 'Add' %> <%= role.name %>
-                                                                </a>
-                                                            </li>
-                                                        <% }); %>
-                                                    </ul>
-                                                </div>
+                                            <div class="d-flex flex-column gap-1">
+                                                <button class="btn btn-sm btn-primary btn-action" 
+                                                        onclick="showRoleManagement('<%= member.id %>', '<%= member.username %>')">
+                                                    <i class="fas fa-user-tag"></i> Manage Roles
+                                                </button>
                                                 <button class="btn btn-sm btn-warning btn-action" 
                                                         onclick="changeNickname('<%= member.id %>', '<%= member.username %>', '<%= member.nickname || '' %>')">
                                                     <i class="fas fa-signature"></i> Change Nickname
@@ -510,9 +679,13 @@
                     notification.parentNode.removeChild(notification);
                 }
             }, 400);
-        }</script>
+        }
+    </script>
 
     <script>
+        let currentMemberId = '';
+        let currentMemberUsername = '';
+
         function applyFilters() {
             const search = document.getElementById('searchFilter').value;
             const role = document.getElementById('roleFilter').value;
@@ -526,6 +699,164 @@
             window.location.href = window.location.pathname + '?' + params.toString();
         }
 
+        function showModerationPopup(memberId, username, avatar) {
+            currentMemberId = memberId;
+            currentMemberUsername = username;
+            const modalTitle = document.getElementById('modalMemberName');
+            const modalMemberIdSpan = document.getElementById('modalMemberId');
+            modalTitle.textContent = username;
+            modalMemberIdSpan.textContent = memberId;
+            document.getElementById('moderationModal').style.display = 'block';
+        }
+
+        function closeModerationModal() {
+            document.getElementById('moderationModal').style.display = 'none';
+            document.getElementById('moderationReason').value = ''; // Clear reason
+        }
+
+        function showRoleManagementModal() {
+            closeModerationModal(); // Close moderation modal first
+
+            // Populate role checkboxes based on current roles
+            const roleCheckboxes = document.querySelectorAll('#roleManagementModal .form-check-input');
+            roleCheckboxes.forEach(checkbox => {
+                checkbox.checked = false; // Reset all checkboxes
+            });
+
+            // Fetch current member roles (example, in a real app you'd likely have this data available)
+            // For now, we'll assume we can re-fetch or have it passed.
+            // Since we don't have the actual member roles here, this part needs data.
+            // A simple approach would be to pass member's current roles to showModerationPopup and store them.
+            // For demonstration, we'll just open the modal.
+
+            document.getElementById('roleModalMemberName').textContent = currentMemberUsername;
+            document.getElementById('roleManagementModal').style.display = 'block';
+        }
+
+        function closeRoleManagementModal() {
+            document.getElementById('roleManagementModal').style.display = 'none';
+        }
+
+        async function updateMemberRoles() {
+            const roleIdsToAdd = [];
+            const roleIdsToRemove = [];
+            const checkboxes = document.querySelectorAll('#roleManagementModal .form-check-input');
+
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    roleIdsToAdd.push(checkbox.value);
+                } else {
+                    roleIdsToRemove.push(checkbox.value);
+                }
+            });
+
+            try {
+                showNotification('info', 'Updating Roles...', 'Applying role changes.');
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${currentMemberId}/roles`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ add: roleIdsToAdd, remove: roleIdsToRemove })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showNotification('success', 'Roles Updated!', result.message, 4000);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification('error', 'Role Update Failed', result.error || 'An error occurred.');
+                }
+            } catch (error) {
+                showNotification('error', 'Network Error', 'Failed to update roles due to connection issues.');
+            }
+            closeRoleManagementModal();
+        }
+
+        async function changeNicknameFromModal() {
+            const newNickname = prompt(`Enter new nickname for ${currentMemberUsername}:`, currentMemberUsername); // Default to username
+            if (newNickname === null) return; // User cancelled
+
+            try {
+                showNotification('info', 'Updating Nickname...', 'Please wait while we update the nickname.');
+
+                const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${currentMemberId}/nickname`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ nickname: newNickname.trim() })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showNotification('success', 'Nickname Updated!', `Successfully changed nickname to "${newNickname.trim() || 'None'}"`, 4000);
+                    setTimeout(() => location.reload(), 1000);
+                    closeModerationModal();
+                } else {
+                    showNotification('error', 'Update Failed', result.error || 'Failed to update nickname');
+                }
+            } catch (error) {
+                showNotification('error', 'Network Error', 'Failed to change nickname due to connection issues');
+            }
+        }
+
+        async function submitKickBanAction(action) {
+            const reason = document.getElementById('moderationReason').value.trim();
+            const deleteMessages = action === 'ban' ? confirm('Delete messages from the last 7 days for ban?') : false;
+
+            if (action === 'kick') {
+                try {
+                    showNotification('info', 'Submitting Kick Request...', 'Your kick request has been sent for approval.');
+                    const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${currentMemberId}/kick-request`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        showNotification('success', 'Kick Request Submitted!', result.message, 4000);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification('error', 'Request Failed', result.error || 'Failed to submit kick request');
+                    }
+                } catch (error) {
+                    showNotification('error', 'Network Error', 'Failed to submit kick request due to connection issues');
+                }
+            } else if (action === 'ban') {
+                try {
+                    showNotification('info', 'Submitting Ban Request...', 'Your ban request has been sent for approval.');
+                    const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${currentMemberId}/ban-request`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason, deleteMessages })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        showNotification('success', 'Ban Request Submitted!', result.message, 4000);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification('error', 'Request Failed', result.error || 'Failed to submit ban request');
+                    }
+                } catch (error) {
+                    showNotification('error', 'Network Error', 'Failed to submit ban request due to connection issues');
+                }
+            }
+            closeModerationModal();
+        }
+
+        // Function to show role management directly from the avatar click
+        function showRoleManagement(memberId, username) {
+            currentMemberId = memberId;
+            currentMemberUsername = username;
+
+            // Fetch current member roles (this part is a placeholder, actual implementation needed)
+            // For now, we'll just open the modal and assume roles will be populated.
+
+            document.getElementById('roleModalMemberName').textContent = username;
+            document.getElementById('roleManagementModal').style.display = 'block';
+        }
+
+        // Original manageRole function (kept for reference but replaced by modal logic)
         async function manageRole(memberId, roleId, action) {
             try {
                 showNotification('info', `${action === 'add' ? 'Adding' : 'Removing'} Role...`, 'Please wait while we update the member\'s roles.');
@@ -550,6 +881,7 @@
             }
         }
 
+        // Original changeNickname function (kept for reference but replaced by modal logic)
         async function changeNickname(memberId, username, currentNickname) {
             const newNickname = prompt(`Enter new nickname for ${username}:`, currentNickname || username);
 

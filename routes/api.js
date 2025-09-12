@@ -1422,6 +1422,140 @@ router.post('/dashboard/:guildId/refresh-nicknames', ensureRole, async (req, res
     }
 });
 
+router.post('/dashboard/:guildId/member/:memberId/kick-request', ensureRole, async (req, res) => {
+    const { guildId, memberId } = req.params;
+    const { reason } = req.body;
+
+    const userGuild = req.user.guilds.find(g => g.id === guildId);
+    if (!userGuild) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Only users with BOTH Access role AND Discord admin permissions can request kicks
+    if (!req.userRole || !req.userRole.hasAdminPermissions) {
+        return res.status(403).json({ error: 'You need both the Access role AND Discord Administrator/Manage Server permissions to request member kicks' });
+    }
+
+    try {
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) {
+            return res.status(404).json({ error: 'Guild not found' });
+        }
+
+        const member = await guild.members.fetch(memberId);
+        if (!member) {
+            return res.status(404).json({ error: 'Member not found' });
+        }
+
+        // Basic checks
+        if (member.id === guild.ownerId) {
+            return res.status(403).json({ error: 'Cannot kick server owner' });
+        }
+
+        const kickReason = reason && reason.trim() ? reason.trim() : 'No reason provided';
+
+        // Send approval request to designated channel
+        const approvalChannelId = '1412210403701817446';
+        const approvalChannel = guild.channels.cache.get(approvalChannelId);
+        
+        if (!approvalChannel) {
+            return res.status(500).json({ error: 'Approval channel not found' });
+        }
+
+        const { sendApprovalRequest } = require('../utils/approvalSystem');
+        await sendApprovalRequest(approvalChannel, {
+            type: 'kick',
+            guildId: guildId,
+            targetId: memberId,
+            targetUsername: member.user.username,
+            targetTag: member.user.tag,
+            requesterId: req.user.id,
+            requesterTag: `${req.user.username}#${req.user.discriminator || '0000'}`,
+            reason: kickReason
+        });
+
+        res.json({
+            success: true,
+            message: 'Kick request submitted for approval'
+        });
+    } catch (error) {
+        console.error('Error submitting kick request:', error);
+        res.status(500).json({ error: 'Failed to submit kick request: ' + error.message });
+    }
+});
+
+router.post('/dashboard/:guildId/member/:memberId/ban-request', ensureRole, async (req, res) => {
+    const { guildId, memberId } = req.params;
+    const { reason, deleteMessages } = req.body;
+
+    const userGuild = req.user.guilds.find(g => g.id === guildId);
+    if (!userGuild) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Only users with BOTH Access role AND Discord admin permissions can request bans
+    if (!req.userRole || !req.userRole.hasAdminPermissions) {
+        return res.status(403).json({ error: 'You need both the Access role AND Discord Administrator/Manage Server permissions to request member bans' });
+    }
+
+    try {
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) {
+            return res.status(404).json({ error: 'Guild not found' });
+        }
+
+        let member;
+        let user;
+        
+        try {
+            member = await guild.members.fetch(memberId);
+            user = member.user;
+        } catch {
+            try {
+                user = await client.users.fetch(memberId);
+            } catch {
+                return res.status(404).json({ error: 'User not found' });
+            }
+        }
+
+        // Basic checks
+        if (member && member.id === guild.ownerId) {
+            return res.status(403).json({ error: 'Cannot ban server owner' });
+        }
+
+        const banReason = reason && reason.trim() ? reason.trim() : 'No reason provided';
+
+        // Send approval request to designated channel
+        const approvalChannelId = '1412210403701817446';
+        const approvalChannel = guild.channels.cache.get(approvalChannelId);
+        
+        if (!approvalChannel) {
+            return res.status(500).json({ error: 'Approval channel not found' });
+        }
+
+        const { sendApprovalRequest } = require('../utils/approvalSystem');
+        await sendApprovalRequest(approvalChannel, {
+            type: 'ban',
+            guildId: guildId,
+            targetId: memberId,
+            targetUsername: user.username,
+            targetTag: user.tag,
+            requesterId: req.user.id,
+            requesterTag: `${req.user.username}#${req.user.discriminator || '0000'}`,
+            reason: banReason,
+            deleteMessages: deleteMessages || false
+        });
+
+        res.json({
+            success: true,
+            message: 'Ban request submitted for approval'
+        });
+    } catch (error) {
+        console.error('Error submitting ban request:', error);
+        res.status(500).json({ error: 'Failed to submit ban request: ' + error.message });
+    }
+});
+
 router.post('/dashboard/:guildId/member/:memberId/ban', ensureRole, async (req, res) => {
     const { guildId, memberId } = req.params;
     const { reason, deleteMessages } = req.body;

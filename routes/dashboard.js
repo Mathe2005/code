@@ -26,7 +26,7 @@ router.get('/', ensureRole, async (req, res) => {
 
                 const hasSpecialRole = member.roles.cache.has(specialRoleId);
                 const hasDjRole = member.roles.cache.has(djRoleId);
-                
+
                 // Check Discord permissions
                 const hasAdministrator = member.permissions.has('Administrator');
                 const hasManageGuild = member.permissions.has('ManageGuild');
@@ -72,7 +72,7 @@ router.get('/:guildId', ensureRole, async (req, res) => {
         if (req.userRole && req.userRole.hasDjRole) {
             return res.redirect(`/dashboard/${guildId}/music`);
         }
-        
+
         return res.status(403).render('error', {
             message: 'Access Denied',
             error: 'You need both the Access role AND Discord Administrator/Manage Server permissions to view guild dashboard.'
@@ -272,7 +272,7 @@ router.get('/:guildId/members', ensureRole, async (req, res) => {
             guild: guildData,
             members: membersData,
             pagination: {
-                current: parseInt(page),
+                current: page,
                 total: Math.ceil(totalMembers / limit),
                 hasNext: offset + limit < totalMembers,
                 hasPrev: page > 1,

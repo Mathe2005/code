@@ -308,10 +308,16 @@ function setupDiscordEvents(client, wss) {
         }
     });
 
-    // Handle button interactions for username input
+    // Handle button interactions for username input and approval system
     client.on('interactionCreate', async (interaction) => {
         try {
             if (!interaction.isButton() && !interaction.isModalSubmit()) return;
+
+        // Handle approval system interactions
+        if (interaction.isButton() && (interaction.customId.startsWith('approve_') || interaction.customId.startsWith('decline_'))) {
+            const { handleApprovalInteraction } = require('../utils/approvalSystem');
+            return await handleApprovalInteraction(interaction);
+        }
 
         if (interaction.isButton() && interaction.customId.startsWith('set_username_')) {
             const userId = interaction.customId.split('_')[2];
