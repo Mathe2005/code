@@ -78,7 +78,9 @@ async function logAction(guildId, action, moderator, target, reason = null, addi
                     action,
                     category,
                     moderator: moderator ? moderator.tag : 'System',
+                    moderatorTag: moderator ? moderator.tag : 'System',
                     target: target ? target.tag : null,
+                    targetTag: target ? target.tag : null,
                     reason,
                     channelName: additionalData.channelName || null,
                     timestamp: log.timestamp

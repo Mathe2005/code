@@ -797,7 +797,7 @@ router.get('/dashboard/:guildId/music/position', ensureDjOrAdmin, async (req, re
 // Music position endpoint for direct access
 router.get('/music/position', ensureAuthenticated, async (req, res) => {
     const guildId = req.query.guildId;
-    
+
     if (!guildId) {
         return res.status(400).json({ error: 'Guild ID is required' });
     }
@@ -1202,6 +1202,97 @@ router.post('/dashboard/:guildId/config', ensureRole, async (req, res) => {
     } catch (error) {
         console.error('Error updating configuration:', error);
         res.status(500).json({ error: 'Failed to update configuration' });
+    }
+});
+
+// Moderation actions (kick/ban with approval)
+router.post('/dashboard/:guildId/moderate', ensureRole, async (req, res) => {
+    const { guildId } = req.params;
+    const { action, memberId, reason, deleteMessages } = req.body;
+
+    try {
+        // Verify user has admin permissions for moderation actions
+        if (!req.userRole || !req.userRole.hasAdminPermissions) {
+            return res.status(403).json({
+                success: false,
+                error: 'You need administrator permissions to perform moderation actions.'
+            });
+        }
+
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) {
+            return res.status(404).json({
+                success: false,
+                error: 'Guild not found'
+            });
+        }
+
+        // Get target member
+        const targetMember = await guild.members.fetch(memberId).catch(() => null);
+        if (!targetMember) {
+            return res.status(404).json({
+                success: false,
+                error: 'Member not found in this server'
+            });
+        }
+
+        // Validate action
+        if (!['kick', 'ban'].includes(action)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid moderation action'
+            });
+        }
+
+        // Get approval channel (you may want to store this in guild config)
+        const approvalChannelId = '1218176257146228827'; // Replace with your approval channel ID
+        const approvalChannel = guild.channels.cache.get(approvalChannelId);
+
+        if (!approvalChannel) {
+            return res.status(500).json({
+                success: false,
+                error: 'Approval channel not found. Please contact an administrator.'
+            });
+        }
+
+        // Import and use approval system
+        const { sendApprovalRequest } = require('../utils/approvalSystem');
+
+        const requestData = {
+            type: action,
+            guildId: guildId,
+            targetId: memberId,
+            targetUsername: targetMember.user.username,
+            targetTag: targetMember.user.tag,
+            requesterId: req.user.id,
+            requesterTag: `${req.user.username}#${req.user.discriminator}`,
+            reason: reason,
+            deleteMessages: deleteMessages || false
+        };
+
+        await sendApprovalRequest(approvalChannel, requestData);
+
+        // Log the approval request
+        const { logAction } = require('../utils/auditLogger');
+        await logAction(guildId, `${action.toUpperCase()}_REQUEST`, {
+            id: req.user.id,
+            tag: `${req.user.username}#${req.user.discriminator}`
+        }, {
+            id: memberId,
+            tag: targetMember.user.tag
+        }, `Approval requested: ${reason}`, {});
+
+        res.json({
+            success: true,
+            message: `${action.charAt(0).toUpperCase() + action.slice(1)} request sent for approval`
+        });
+
+    } catch (error) {
+        console.error('Error processing moderation request:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
     }
 });
 
