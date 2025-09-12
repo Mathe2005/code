@@ -10,8 +10,7 @@ module.exports = (sequelize) => {
         },
         guildId: {
             type: DataTypes.STRING(255),
-            allowNull: false,
-            unique: true
+            allowNull: false
         },
         prefix: {
             type: DataTypes.STRING(50),

@@ -16,7 +16,7 @@ module.exports = (sequelize) => {
             allowNull: false
         },
         category: {
-            type: DataTypes.ENUM('MODERATION', 'MEMBER', 'MESSAGE', 'CHANNEL', 'ROLE', 'SERVER', 'CONFIG','MUSIC'),
+            type: DataTypes.ENUM('MODERATION', 'MEMBER', 'MESSAGE', 'CHANNEL', 'ROLE', 'SERVER', 'CONFIG', 'MUSIC', 'VOICE', 'SYSTEM'),
             allowNull: false,
             defaultValue: 'MODERATION'
         },

@@ -1,4 +1,3 @@
-
 const Discord = require('discord.js');
 const { logAction, wasRecentDashboardAction } = require('../utils/auditLogger');
 const { updateMemberNickname } = require('../utils/guildUtils');
@@ -6,7 +5,7 @@ const { updateMemberNickname } = require('../utils/guildUtils');
 function setupDiscordEvents(client, wss) {
     client.on('clientReady', async () => {
         console.log(`Bot logged in as ${client.user.tag}!`);
-        
+
         // Wait a moment for client to be fully ready
         const { initializeLavalink } = require('../services/musicService');
         setTimeout(async () => {
@@ -18,7 +17,7 @@ function setupDiscordEvents(client, wss) {
     client.on('raw', (d) => {
         const { getLavalinkManager } = require('../services/musicService');
         const managerInstance = getLavalinkManager();
-        
+
         if (managerInstance && ['VOICE_STATE_UPDATE', 'VOICE_SERVER_UPDATE'].includes(d.t)) {
             try {
                 // Use the correct method for lavalink-client voice updates
@@ -114,7 +113,7 @@ function setupDiscordEvents(client, wss) {
                     // Check if any added role is a configured role and send username input embed
                     const { getOrCreateGuildConfig } = require('../utils/guildUtils');
                     const config = await getOrCreateGuildConfig(newMember.guild.id);
-                    
+
                     if (config && config.roleConfigs) {
                         let roleConfigs = config.roleConfigs;
                         if (typeof roleConfigs === 'string') {
@@ -131,10 +130,10 @@ function setupDiscordEvents(client, wss) {
                             const hasConfiguredRole = addedRoles.some(role => {
                                 const roleConfig = roleConfigs.find(rc => rc.roleId === role.id);
                                 if (!roleConfig) return false;
-                                
+
                                 const hasSymbol = roleConfig.symbol && typeof roleConfig.symbol === 'string' && roleConfig.symbol.trim() !== '';
                                 const hasSpecial = roleConfig.applySpecial === true || roleConfig.applySpecial === 'true' || roleConfig.applySpecial === 'Yes';
-                                
+
                                 return hasSymbol || hasSpecial;
                             });
 
@@ -142,7 +141,7 @@ function setupDiscordEvents(client, wss) {
                                 // Check if user already has a custom nickname set
                                 const { getCustomNickname } = require('../utils/guildUtils');
                                 const existingNickname = await getCustomNickname(newMember.user.id, newMember.guild.id);
-                                
+
                                 // Only send embed if user doesn't already have a custom nickname
                                 if (!existingNickname) {
                                     const embed = new Discord.EmbedBuilder()
@@ -167,7 +166,7 @@ function setupDiscordEvents(client, wss) {
                                         // If DM fails, try to send in a system channel or the first available text channel
                                         const systemChannel = newMember.guild.systemChannel || 
                                                              newMember.guild.channels.cache.find(ch => ch.type === 0 && ch.permissionsFor(newMember.guild.members.me).has('SendMessages'));
-                                        
+
                                         if (systemChannel) {
                                             await systemChannel.send({ 
                                                 content: `${newMember.user}`, 
@@ -316,7 +315,7 @@ function setupDiscordEvents(client, wss) {
 
         if (interaction.isButton() && interaction.customId.startsWith('set_username_')) {
             const userId = interaction.customId.split('_')[2];
-            
+
             // Check if the interaction user is the intended user
             if (interaction.user.id !== userId) {
                 return interaction.reply({ content: 'ეს შენთვის არაა ბიძი!', flags: Discord.MessageFlags.Ephemeral });
@@ -343,14 +342,14 @@ function setupDiscordEvents(client, wss) {
 
         if (interaction.isModalSubmit() && interaction.customId.startsWith('username_modal_')) {
             const userId = interaction.customId.split('_')[2];
-            
+
             // Check if the interaction user is the intended user
             if (interaction.user.id !== userId) {
                 return interaction.reply({ content: 'ეს შენთვის არაა ბიძი!', flags: Discord.MessageFlags.Ephemeral });
             }
 
             const username = interaction.fields.getTextInputValue('username_input');
-            
+
             // Find the guild - if in DM, find the guild where the user has the configured role
             let guild = interaction.guild;
             let member = null;
@@ -362,7 +361,7 @@ function setupDiscordEvents(client, wss) {
                     if (guildMember) {
                         const { getOrCreateGuildConfig } = require('../utils/guildUtils');
                         const config = await getOrCreateGuildConfig(guildId);
-                        
+
                         if (config && config.roleConfigs) {
                             let roleConfigs = config.roleConfigs;
                             if (typeof roleConfigs === 'string') {
@@ -402,7 +401,7 @@ function setupDiscordEvents(client, wss) {
             try {
                 const { updateCustomNickname } = require('../utils/guildUtils');
                 await updateCustomNickname(member, username);
-                
+
                 // Delete the original embed message if it exists
                 try {
                     if (interaction.message && interaction.message.deletable) {
@@ -411,7 +410,7 @@ function setupDiscordEvents(client, wss) {
                 } catch (deleteError) {
                     console.log('Could not delete original embed message:', deleteError.message);
                 }
-                
+
                 await interaction.reply({ content: `✅ Your in-game username has been set to: **${username}**`, flags: Discord.MessageFlags.Ephemeral });
             } catch (error) {
                 console.error('Error updating custom nickname:', error);
@@ -430,8 +429,276 @@ function setupDiscordEvents(client, wss) {
         }
     });
 
-    // Channel Events, Role Events, Ban Events would go here...
-    // (I'll include a few more key ones)
+    // Ban Events
+    client.on('guildBanAdd', async (ban) => {
+        try {
+            const auditLogs = await ban.guild.fetchAuditLogs({
+                limit: 3,
+                type: Discord.AuditLogEvent.MemberBanAdd
+            });
+
+            const banLog = auditLogs.entries.find(entry =>
+                entry.target?.id === ban.user.id &&
+                Date.now() - entry.createdTimestamp < 5000
+            );
+
+            const executor = banLog ? banLog.executor : { id: 'system', tag: 'System' };
+            const reason = banLog ? banLog.reason || 'No reason provided' : 'No reason provided';
+            await logAction(ban.guild.id, 'MEMBER_BAN', executor, ban.user, reason, {}, wss);
+        } catch (error) {
+            console.error('Error checking ban audit logs:', error);
+            try {
+                await logAction(ban.guild.id, 'MEMBER_BAN', { id: 'system', tag: 'System' }, ban.user, 'Member banned', {}, wss);
+            } catch (logError) {
+                console.error('Error logging ban action:', logError);
+            }
+        }
+    });
+
+    // Channel Events
+    client.on('channelCreate', async (channel) => {
+        try {
+            if (!channel.guild) return;
+
+            const auditLogs = await channel.guild.fetchAuditLogs({
+                limit: 3,
+                type: Discord.AuditLogEvent.ChannelCreate
+            });
+
+            const createLog = auditLogs.entries.find(entry =>
+                entry.target?.id === channel.id &&
+                Date.now() - entry.createdTimestamp < 5000
+            );
+
+            const executor = createLog ? createLog.executor : { id: 'system', tag: 'System' };
+            await logAction(channel.guild.id, 'CHANNEL_CREATE', executor, null, `Channel #${channel.name} created`, {
+                channelId: channel.id,
+                channelName: channel.name
+            }, wss);
+        } catch (error) {
+            console.error('Error logging channel create:', error);
+        }
+    });
+
+    client.on('channelDelete', async (channel) => {
+        try {
+            if (!channel.guild) return;
+
+            const auditLogs = await channel.guild.fetchAuditLogs({
+                limit: 3,
+                type: Discord.AuditLogEvent.ChannelDelete
+            });
+
+            const deleteLog = auditLogs.entries.find(entry =>
+                entry.target?.id === channel.id &&
+                Date.now() - entry.createdTimestamp < 5000
+            );
+
+            const executor = deleteLog ? deleteLog.executor : { id: 'system', tag: 'System' };
+            await logAction(channel.guild.id, 'CHANNEL_DELETE', executor, null, `Channel #${channel.name} deleted`, {
+                channelId: channel.id,
+                channelName: channel.name
+            }, wss);
+        } catch (error) {
+            console.error('Error logging channel delete:', error);
+        }
+    });
+
+    client.on('channelUpdate', async (oldChannel, newChannel) => {
+        try {
+            if (!newChannel.guild) return;
+
+            const changes = [];
+            if (oldChannel.name !== newChannel.name) {
+                changes.push(`Name: ${oldChannel.name} → ${newChannel.name}`);
+            }
+            if (oldChannel.topic !== newChannel.topic) {
+                changes.push(`Topic: ${oldChannel.topic || 'None'} → ${newChannel.topic || 'None'}`);
+            }
+
+            if (changes.length > 0) {
+                const auditLogs = await newChannel.guild.fetchAuditLogs({
+                    limit: 3,
+                    type: Discord.AuditLogEvent.ChannelUpdate
+                });
+
+                const updateLog = auditLogs.entries.find(entry =>
+                    entry.target?.id === newChannel.id &&
+                    Date.now() - entry.createdTimestamp < 5000
+                );
+
+                const executor = updateLog ? updateLog.executor : { id: 'system', tag: 'System' };
+                await logAction(newChannel.guild.id, 'CHANNEL_UPDATE', executor, null, `Channel #${newChannel.name} updated: ${changes.join(', ')}`, {
+                    channelId: newChannel.id,
+                    channelName: newChannel.name
+                }, wss);
+            }
+        } catch (error) {
+            console.error('Error logging channel update:', error);
+        }
+    });
+
+    // Role Events
+    client.on('roleCreate', async (role) => {
+        try {
+            const auditLogs = await role.guild.fetchAuditLogs({
+                limit: 3,
+                type: Discord.AuditLogEvent.RoleCreate
+            });
+
+            const createLog = auditLogs.entries.find(entry =>
+                entry.target?.id === role.id &&
+                Date.now() - entry.createdTimestamp < 5000
+            );
+
+            const executor = createLog ? createLog.executor : { id: 'system', tag: 'System' };
+            await logAction(role.guild.id, 'ROLE_CREATE', executor, null, `Role "${role.name}" created`, {}, wss);
+        } catch (error) {
+            console.error('Error logging role create:', error);
+        }
+    });
+
+    client.on('roleDelete', async (role) => {
+        try {
+            const auditLogs = await role.guild.fetchAuditLogs({
+                limit: 3,
+                type: Discord.AuditLogEvent.RoleDelete
+            });
+
+            const deleteLog = auditLogs.entries.find(entry =>
+                entry.target?.id === role.id &&
+                Date.now() - entry.createdTimestamp < 5000
+            );
+
+            const executor = deleteLog ? deleteLog.executor : { id: 'system', tag: 'System' };
+            await logAction(role.guild.id, 'ROLE_DELETE', executor, null, `Role "${role.name}" deleted`, {}, wss);
+        } catch (error) {
+            console.error('Error logging role delete:', error);
+        }
+    });
+
+    client.on('roleUpdate', async (oldRole, newRole) => {
+        try {
+            const changes = [];
+            if (oldRole.name !== newRole.name) {
+                changes.push(`Name: ${oldRole.name} → ${newRole.name}`);
+            }
+            if (oldRole.color !== newRole.color) {
+                changes.push(`Color changed`);
+            }
+            if (oldRole.permissions.bitfield !== newRole.permissions.bitfield) {
+                changes.push(`Permissions updated`);
+            }
+
+            if (changes.length > 0) {
+                const auditLogs = await newRole.guild.fetchAuditLogs({
+                    limit: 3,
+                    type: Discord.AuditLogEvent.RoleUpdate
+                });
+
+                const updateLog = auditLogs.entries.find(entry =>
+                    entry.target?.id === newRole.id &&
+                    Date.now() - entry.createdTimestamp < 5000
+                );
+
+                const executor = updateLog ? updateLog.executor : { id: 'system', tag: 'System' };
+                await logAction(newRole.guild.id, 'ROLE_UPDATE', executor, null, `Role "${newRole.name}" updated: ${changes.join(', ')}`, {}, wss);
+            }
+        } catch (error) {
+            console.error('Error logging role update:', error);
+        }
+    });
+
+    // Voice Events
+    client.on('voiceStateUpdate', async (oldState, newState) => {
+        try {
+            if (!newState.guild) return;
+
+            const member = newState.member;
+            if (!member || member.user.bot) return;
+
+            if (!oldState.channelId && newState.channelId) {
+                // User joined voice channel
+                await logAction(newState.guild.id, 'VOICE_JOIN', member.user, member.user, `Joined voice channel: ${newState.channel.name}`, {
+                    channelId: newState.channelId,
+                    channelName: newState.channel.name
+                }, wss);
+            } else if (oldState.channelId && !newState.channelId) {
+                // User left voice channel
+                await logAction(newState.guild.id, 'VOICE_LEAVE', member.user, member.user, `Left voice channel: ${oldState.channel.name}`, {
+                    channelId: oldState.channelId,
+                    channelName: oldState.channel.name
+                }, wss);
+            } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+                // User moved between voice channels - check for moderator action
+                try {
+                    // Small delay to ensure audit log is available
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    const auditLogs = await newState.guild.fetchAuditLogs({
+                        limit: 10,
+                        type: Discord.AuditLogEvent.MemberMove
+                    });
+
+                    // Find the most recent audit log entry for voice moves
+                    const moveLog = auditLogs.entries.find(entry => {
+                        const timeDiff = Date.now() - entry.createdTimestamp;
+                        const isRecent = timeDiff < 10000; // Within 10 seconds
+                        const isDifferentExecutor = entry.executor.id !== member.user.id;
+                        const isNotBot = !entry.executor.bot;
+
+                        console.log(`Audit log entry: Executor: ${entry.executor.tag}, Recent: ${isRecent}, DifferentExecutor: ${isDifferentExecutor}, TimeDiff: ${timeDiff}ms`);
+
+                        return isRecent && isDifferentExecutor && isNotBot;
+                    });
+
+                    if (moveLog) {
+                        // Someone else moved a user recently - assume it was this move
+                        console.log(`✅ Voice move by moderator detected: ${moveLog.executor.tag} moved ${member.user.tag} from ${oldState.channel.name} to ${newState.channel.name}`);
+                        await logAction(newState.guild.id, 'VOICE_MOVE', moveLog.executor, member.user, `Moved from ${oldState.channel.name} to ${newState.channel.name}`, {
+                            fromChannelId: oldState.channelId,
+                            fromChannelName: oldState.channel.name,
+                            toChannelId: newState.channelId,
+                            toChannelName: newState.channel.name
+                        }, wss);
+                    } else {
+                        // No recent moderator action found - user moved themselves
+                        console.log(`ℹ️ User ${member.user.tag} self-moved from ${oldState.channel.name} to ${newState.channel.name}`);
+                    }
+                } catch (error) {
+                    console.error('Error checking voice move audit logs:', error);
+                }
+            }
+        } catch (error) {
+            console.error('Error logging voice state update:', error);
+        }
+    });
+
+    // Guild Events
+    client.on('guildUpdate', async (oldGuild, newGuild) => {
+        try {
+            const changes = [];
+            if (oldGuild.name !== newGuild.name) {
+                changes.push(`Name: ${oldGuild.name} → ${newGuild.name}`);
+            }
+            if (oldGuild.description !== newGuild.description) {
+                changes.push(`Description updated`);
+            }
+
+            if (changes.length > 0) {
+                const auditLogs = await newGuild.fetchAuditLogs({
+                    limit: 3,
+                    type: Discord.AuditLogEvent.GuildUpdate
+                });
+
+                const updateLog = auditLogs.entries.first();
+                const executor = updateLog ? updateLog.executor : { id: 'system', tag: 'System' };
+                await logAction(newGuild.id, 'SERVER_UPDATE', executor, null, `Server updated: ${changes.join(', ')}`, {}, wss);
+            }
+        } catch (error) {
+            console.error('Error logging guild update:', error);
+        }
+    });
 
     client.on('guildBanRemove', async (ban) => {
         try {

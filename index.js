@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const WebSocket = require('ws');
+const slowDown = require('express-slow-down');
 require('dotenv').config();
 
 // Import configurations and services
@@ -76,13 +77,17 @@ app.use(helmet({
             ],
             connectSrc: [
                 "'self'",
+                "http:",
                 "https:",
+                "ws:",
                 "wss:"
-            ]
+            ],
+            upgradeInsecureRequests: null // Disable upgrade for HTTP deployment
         }
     },
     crossOriginOpenerPolicy: false,
-    originAgentCluster: false
+    originAgentCluster: false,
+    hsts: false // Disable HSTS for HTTP deployment
 }));
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -90,26 +95,25 @@ app.use(bodyParser.json());
 app.use(express.static('public'));
 app.set('view engine', 'ejs');
 
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    trustProxy: 1 // Trust only first proxy for rate limiting
-});
-app.use(limiter);
+// Enhanced security middleware
+const securityMiddleware = require('./middleware/security');
+app.use(securityMiddleware.createSecurityStack());
 
-// Add middleware to handle HTTP-only requests and prevent HTTPS redirects
+// Add security headers and request validation
+const { securityHeaders, validateRequest } = require('./middleware/security');
+app.use(securityHeaders);
+app.use(validateRequest);
+
+// Add middleware for HTTP deployment compatibility
 app.use((req, res, next) => {
-    // Remove any HTTPS upgrade headers
+    // Remove any HTTPS upgrade headers for HTTP deployment
     res.removeHeader('Strict-Transport-Security');
     
-    // Ensure we're working with HTTP protocol
-    if (req.headers['x-forwarded-proto'] === 'https') {
-        req.protocol = 'http';
+    // Set proper protocol for HTTP deployment
+    req.protocol = 'http';
+    if (req.headers['x-forwarded-proto']) {
         req.headers['x-forwarded-proto'] = 'http';
     }
-    
-    // Set headers to prevent HTTPS redirects
-    res.setHeader('Content-Security-Policy', "upgrade-insecure-requests; block-all-mixed-content;".replace('upgrade-insecure-requests; ', ''));
     
     next();
 });
@@ -157,6 +161,27 @@ app.get('/logout', (req, res) => {
         if (err) return next(err);
         res.redirect('/');
     });
+});
+
+// Security monitoring endpoint (admin only)
+app.get('/security/logs', ensureAuthenticated, async (req, res) => {
+    // Check if user has admin permissions in any guild
+    const hasAdminAccess = req.user.guilds?.some(guild => {
+        const permissions = parseInt(guild.permissions);
+        return (permissions & 0x8) === 0x8; // Administrator permission
+    });
+
+    if (!hasAdminAccess) {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    try {
+        const securityLogger = require('./utils/securityLogger');
+        const logs = await securityLogger.getRecentLogs(24);
+        res.json({ logs });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch security logs' });
+    }
 });
 
 // Mount route modules

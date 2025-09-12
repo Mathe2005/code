@@ -1470,7 +1470,7 @@
 
         async function removeRole(memberId, roleId, buttonElement) {
             try {
-                showNotification('info', 'Removing Role...', 'Please wait while we remove the role.');
+                showNotification('info', 'Removing Role...', 'Please wait while we remove the role from the member.');
 
                 const response = await fetch(`/api/dashboard/<%= guild.id %>/member/${memberId}/role`, {
                     method: 'POST',

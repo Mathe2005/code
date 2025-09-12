@@ -1,4 +1,3 @@
-
 const WebSocket = require('ws');
 const { sequelize } = require('../config/database');
 
@@ -44,8 +43,10 @@ async function logAction(guildId, action, moderator, target, reason = null, addi
             category = 'ROLE';
         } else if (['BOT_CONFIG_UPDATE', 'COMMAND_USED'].includes(action)) {
             category = 'CONFIG';
-        } else if (['SERVER_UPDATE', 'SERVER_BOOST', 'SERVER_UNBOOST', 'VOICE_JOIN', 'VOICE_LEAVE', 'VOICE_MOVE'].includes(action)) {
+        } else if (['SERVER_UPDATE', 'SERVER_BOOST', 'SERVER_UNBOOST'].includes(action)) {
             category = 'SERVER';
+        } else if (['VOICE_JOIN', 'VOICE_LEAVE', 'VOICE_MOVE'].includes(action)) {
+            category = 'VOICE';
         } else if (['MUSIC_PLAY', 'MUSIC_SKIP', 'MUSIC_STOP', 'MUSIC_VOLUME', 'MUSIC_QUEUE_ADD', 'MUSIC_QUEUE_REMOVE'].includes(action)) {
             category = 'MUSIC';
         } else if (['LOGIN_SUCCESS', 'LOGIN_FAILED', 'PERMISSION_DENIED', 'ERROR_OCCURRED'].includes(action)) {

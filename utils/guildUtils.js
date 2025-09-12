@@ -408,10 +408,67 @@ async function deleteCustomNickname(userId, guildId) {
     }
 }
 
+// Update all members with configured roles when configuration changes
+async function updateAllMembersWithConfiguredRoles(guild, roleConfigs) {
+    try {
+        if (!Array.isArray(roleConfigs) || roleConfigs.length === 0) {
+            return;
+        }
+
+        // Get all role IDs that have meaningful configuration
+        const configuredRoleIds = roleConfigs.filter(roleConfig => {
+            const hasSymbol = roleConfig.symbol && typeof roleConfig.symbol === 'string' && roleConfig.symbol.trim() !== '';
+            const hasSpecial = roleConfig.applySpecial === true || roleConfig.applySpecial === 'true' || roleConfig.applySpecial === 'Yes';
+            return roleConfig.roleId && (hasSymbol || hasSpecial);
+        }).map(rc => rc.roleId);
+
+        if (configuredRoleIds.length === 0) {
+            return;
+        }
+
+        // Get all members who have any of the configured roles
+        const membersToUpdate = new Set();
+        
+        for (const roleId of configuredRoleIds) {
+            const role = guild.roles.cache.get(roleId);
+            if (role) {
+                role.members.forEach(member => {
+                    if (!member.user.bot) {
+                        membersToUpdate.add(member);
+                    }
+                });
+            }
+        }
+
+        console.log(`Updating nicknames for ${membersToUpdate.size} members with configured roles...`);
+
+        // Update nicknames for all affected members with a small delay between each to avoid rate limits
+        let updateCount = 0;
+        for (const member of membersToUpdate) {
+            try {
+                await updateMemberNickname(member);
+                updateCount++;
+                
+                // Add a small delay to avoid hitting Discord rate limits
+                if (updateCount % 5 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (error) {
+                console.error(`Error updating nickname for ${member.user.tag}:`, error);
+            }
+        }
+
+        console.log(`Successfully updated ${updateCount} member nicknames.`);
+    } catch (error) {
+        console.error('Error updating all members with configured roles:', error);
+    }
+}
+
 module.exports = {
     getOrCreateGuildConfig,
     updateMemberNickname,
     updateCustomNickname,
+    updateAllMembersWithConfiguredRoles,
     saveCustomNickname,
     getCustomNickname,
     deleteCustomNickname

@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { ensureRole, ensureDjOrAdmin, ensureAuthenticated } = require('../middleware/auth');
 const { getOrCreateGuildConfig, updateMemberNickname } = require('../utils/guildUtils');
-const { AuditLog, logAction, trackDashboardAction } = require('../utils/auditLogger');
+const { logAction, trackDashboardAction } = require('../utils/auditLogger');
 const { getMusicQueue, broadcastMusicUpdate, manager, playNextSong } = require('../services/musicService');
 const { Sequelize, Op } = require('sequelize');
 const client = require('../config/discord');
+const { getRealIP, createAdvancedRateLimit } = require('../middleware/security');
 
 // Add this at the top after the imports
 let wss;
@@ -13,6 +14,70 @@ let wss;
 function setWebSocketServer(webSocketServer) {
     wss = webSocketServer;
 }
+
+// API security monitoring middleware
+router.use((req, res, next) => {
+    const ip = getRealIP(req);
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    const endpoint = req.path;
+    
+    // Log API access for monitoring
+    if (req.user) {
+        console.log(`📊 API Access: ${req.user.username} from ${ip} -> ${req.method} ${endpoint}`);
+    } else {
+        console.log(`📊 Unauthenticated API Access: ${ip} -> ${req.method} ${endpoint}`);
+    }
+    
+    // Set response time header for monitoring
+    const startTime = Date.now();
+    res.on('finish', () => {
+        const responseTime = Date.now() - startTime;
+        
+        // Only set header if response hasn't been sent yet
+        if (!res.headersSent) {
+            try {
+                res.setHeader('X-Response-Time', `${responseTime}ms`);
+            } catch (error) {
+                // Ignore header setting errors
+            }
+        }
+        
+        // Log slow responses
+        if (responseTime > 5000) {
+            console.log(`⚠️ Slow API Response: ${endpoint} took ${responseTime}ms for ${ip}`);
+        }
+    });
+    
+    next();
+});
+
+// Enhanced rate limiting for specific API endpoints
+router.use('/dashboard/:guildId/music/play', createAdvancedRateLimit({
+    windowMs: 2 * 60 * 1000, // 2 minutes
+    max: 10, // Max 10 songs per 2 minutes
+    message: {
+        error: 'Music rate limit exceeded',
+        message: 'Too many songs added, please wait before adding more'
+    }
+}));
+
+router.use('/dashboard/:guildId/member/:memberId/kick', createAdvancedRateLimit({
+    windowMs: 10 * 60 * 1000, // 10 minutes
+    max: 5, // Max 5 kicks per 10 minutes
+    message: {
+        error: 'Moderation rate limit exceeded',
+        message: 'Too many moderation actions, please wait'
+    }
+}));
+
+router.use('/dashboard/:guildId/member/:memberId/ban', createAdvancedRateLimit({
+    windowMs: 10 * 60 * 1000, // 10 minutes
+    max: 3, // Max 3 bans per 10 minutes
+    message: {
+        error: 'Ban rate limit exceeded',
+        message: 'Too many ban actions, please wait'
+    }
+}));
 
 // Force music state update for page loads/refreshes
 router.get('/dashboard/:guildId/music/status', ensureAuthenticated, async (req, res) => {
@@ -871,8 +936,11 @@ router.get('/dashboard/:guildId/logs', ensureRole, async (req, res) => {
     }
 
     try {
-        const { AuditLog } = require('../utils/auditLogger');
+        const { sequelize } = require('../config/database');
         const { Op } = require('sequelize');
+        
+        // Import AuditLog model properly - use the export from auditLogger
+        const { AuditLog } = require('../utils/auditLogger');
 
         const whereClause = { guildId };
 
@@ -885,10 +953,10 @@ router.get('/dashboard/:guildId/logs', ensureRole, async (req, res) => {
         }
         if (search && search !== '') {
             whereClause[Op.or] = [
-                { moderatorTag: { [Op.iLike]: `%${search}%` } },
-                { targetTag: { [Op.iLike]: `%${search}%` } },
-                { reason: { [Op.iLike]: `%${search}%` } },
-                { channelName: { [Op.iLike]: `%${search}%` } }
+                { moderatorTag: { [Op.like]: `%${search}%` } },
+                { targetTag: { [Op.like]: `%${search}%` } },
+                { reason: { [Op.like]: `%${search}%` } },
+                { channelName: { [Op.like]: `%${search}%` } }
             ];
         }
         if (startDate && startDate !== '') {
@@ -994,17 +1062,54 @@ router.post('/dashboard/:guildId/config', ensureRole, async (req, res) => {
     }
 
     try {
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) {
+            return res.status(404).json({ error: 'Guild not found' });
+        }
+
         const config = await getOrCreateGuildConfig(guildId);
+
+        // Track if role configs are being changed
+        const oldRoleConfigs = config.roleConfigs;
+        let roleConfigsChanged = false;
 
         // Update configuration fields
         if (prefix !== undefined) config.prefix = prefix;
         if (logChannel !== undefined) config.logChannel = logChannel;
         if (specialSuffix !== undefined) config.specialSuffix = specialSuffix;
         if (roleConfigs !== undefined) {
-            config.roleConfigs = Array.isArray(roleConfigs) ? roleConfigs : [];
+            const newRoleConfigs = Array.isArray(roleConfigs) ? roleConfigs : [];
+            
+            // Check if role configs actually changed
+            const oldConfigsStr = JSON.stringify(oldRoleConfigs);
+            const newConfigsStr = JSON.stringify(newRoleConfigs);
+            
+            if (oldConfigsStr !== newConfigsStr) {
+                roleConfigsChanged = true;
+                config.roleConfigs = newRoleConfigs;
+            }
         }
 
         await config.save();
+
+        // If role configurations changed, apply to all members with configured roles
+        if (roleConfigsChanged) {
+            const { updateAllMembersWithConfiguredRoles } = require('../utils/guildUtils');
+            
+            // Parse the new role configs
+            let parsedRoleConfigs = config.roleConfigs;
+            if (typeof parsedRoleConfigs === 'string') {
+                try {
+                    parsedRoleConfigs = JSON.parse(parsedRoleConfigs);
+                } catch (parseError) {
+                    console.error('Error parsing roleConfigs JSON:', parseError);
+                    parsedRoleConfigs = [];
+                }
+            }
+
+            // Apply changes to all members with configured roles
+            await updateAllMembersWithConfiguredRoles(guild, parsedRoleConfigs);
+        }
 
         // Log the configuration update
         const moderator = {
@@ -1012,11 +1117,17 @@ router.post('/dashboard/:guildId/config', ensureRole, async (req, res) => {
             tag: `${req.user.username}#${req.user.discriminator || '0000'}`
         };
 
-        await logAction(guildId, 'BOT_CONFIG_UPDATE', moderator, null, 'Configuration updated via dashboard', {}, wss);
+        const logMessage = roleConfigsChanged ? 
+            'Configuration updated and applied to all relevant members via dashboard' :
+            'Configuration updated via dashboard';
+
+        await logAction(guildId, 'BOT_CONFIG_UPDATE', moderator, null, logMessage, {}, wss);
 
         res.json({
             success: true,
-            message: 'Configuration updated successfully',
+            message: roleConfigsChanged ? 
+                'Configuration updated and applied to all relevant members' :
+                'Configuration updated successfully',
             config: {
                 prefix: config.prefix,
                 logChannel: config.logChannel,
@@ -1249,6 +1360,65 @@ router.post('/dashboard/:guildId/member/:memberId/kick', ensureRole, async (req,
     } catch (error) {
         console.error('Error kicking member:', error);
         res.status(500).json({ error: 'Failed to kick member: ' + error.message });
+    }
+});
+
+// Manual refresh endpoint for all member nicknames
+router.post('/dashboard/:guildId/refresh-nicknames', ensureRole, async (req, res) => {
+    const { guildId } = req.params;
+
+    const userGuild = req.user.guilds.find(g => g.id === guildId);
+    if (!userGuild) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Only users with BOTH Access role AND Discord admin permissions can refresh nicknames
+    if (!req.userRole || !req.userRole.hasAdminPermissions) {
+        return res.status(403).json({ error: 'You need both the Access role AND Discord Administrator/Manage Server permissions to refresh nicknames' });
+    }
+
+    try {
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) {
+            return res.status(404).json({ error: 'Guild not found' });
+        }
+
+        // Get current configuration
+        const config = await getOrCreateGuildConfig(guildId);
+        if (!config || !config.roleConfigs) {
+            return res.status(400).json({ error: 'No role configuration found' });
+        }
+
+        // Parse roleConfigs
+        let roleConfigs = config.roleConfigs;
+        if (typeof roleConfigs === 'string') {
+            try {
+                roleConfigs = JSON.parse(roleConfigs);
+            } catch (parseError) {
+                return res.status(400).json({ error: 'Invalid roleConfigs format' });
+            }
+        }
+
+        // Update all members with configured roles
+        const { updateAllMembersWithConfiguredRoles } = require('../utils/guildUtils');
+        await updateAllMembersWithConfiguredRoles(guild, roleConfigs);
+
+        // Log the manual refresh
+        const moderator = {
+            id: req.user.id,
+            tag: `${req.user.username}#${req.user.discriminator || '0000'}`
+        };
+
+        await logAction(guildId, 'NICKNAME_REFRESH', moderator, null, 'Manual nickname refresh triggered via dashboard', {}, wss);
+
+        res.json({ 
+            success: true, 
+            message: 'All member nicknames have been refreshed' 
+        });
+
+    } catch (error) {
+        console.error('Error refreshing member nicknames:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
