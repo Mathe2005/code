@@ -81,13 +81,17 @@ async function logAction(guildId, action, moderator, target, reason = null, addi
                     target: target ? target.tag : null,
                     reason,
                     channelName: additionalData.channelName || null,
-                    timestamp: new Date()
+                    timestamp: log.timestamp
                 }
             };
 
             wss.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify(logData));
+                if (client.readyState === WebSocket.OPEN && client.guildId === guildId) {
+                    try {
+                        client.send(JSON.stringify(logData));
+                    } catch (error) {
+                        console.error('Error sending WebSocket message:', error);
+                    }
                 }
             });
         }

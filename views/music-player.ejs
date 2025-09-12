@@ -542,42 +542,186 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // WebSocket connection for real-time updates
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+        // WebSocket connection
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        let isConnecting = false;
+        let isPageVisible = true;
+        let isNavigating = false;
+        let reconnectTimeout = null;
 
-        ws.onopen = function() {
-            console.log('WebSocket connected');
-            ws.send(JSON.stringify({
-                type: 'subscribe',
-                guildId: '<%= guild.id %>'
-            }));
-            console.log('Subscribed to guild updates for guild <%= guild.id %>');
-        };
-
-        ws.onclose = function() {
-            console.log('WebSocket disconnected');
-        };
-
-        ws.onerror = function(error) {
-            console.error('WebSocket error:', error);
-        };
-
-        ws.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                console.log('WebSocket message received:', data);
-                if (data.type === 'music_update' && data.data.guildId === '<%= guild.id %>') {
-                    console.log('Processing music update:', data.data);
-                    // Add a small delay to ensure DOM is ready
-                    setTimeout(() => {
-                        updateMusicUI(data.data);
-                    }, 50);
-                }
-            } catch (error) {
-                console.error('WebSocket message error:', error);
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            isPageVisible = !document.hidden;
+            if (isPageVisible && !isNavigating && (!ws || ws.readyState !== WebSocket.OPEN)) {
+                console.log('Page became visible, reconnecting WebSocket');
+                setTimeout(connectWebSocket, 100);
             }
-        };
+        });
+
+        // Handle page navigation to prevent disconnect flash
+        window.addEventListener('beforeunload', function() {
+            isNavigating = true;
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.onclose = null; // Prevent reconnection attempts
+                ws.onerror = null; // Prevent error logging
+                ws.close(1001, 'Page navigating'); // Clean close with "going away" code
+            }
+        });
+
+        // Handle page show event (back/forward navigation)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                // Page was restored from cache
+                isNavigating = false;
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    setTimeout(connectWebSocket, 100);
+                }
+            }
+        });
+
+        function connectWebSocket() {
+            if (isConnecting || isNavigating || (ws && ws.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+
+            isConnecting = true;
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    reconnectAttempts = 0;
+                    isConnecting = false;
+                    ws.send(JSON.stringify({ type: 'subscribe', guildId: '<%= guild.id %>' }));
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'music_update' && data.data.guildId === '<%= guild.id %>') {
+                            updateMusicDisplay(data.data);
+                        } else if (data.type === 'pong') {
+                            // Handle pong response
+                            console.log('WebSocket pong received');
+                        }
+                    } catch (error) {
+                        console.error('WebSocket message error:', error);
+                    }
+                };
+
+                ws.onclose = function(event) {
+                    isConnecting = false;
+                    
+                    // Don't show disconnect messages during navigation
+                    if (isNavigating) {
+                        return;
+                    }
+
+                    if (!isPageVisible) {
+                        console.log('WebSocket closed while page not visible, not reconnecting');
+                        return;
+                    }
+
+                    // Only log and handle unexpected disconnections (not normal closes or going away)
+                    // 1000 = Normal closure, 1001 = Going away (page navigation/refresh)
+                    // 1006 = Abnormal closure (connection lost), 1011 = Server error
+                    const isUnexpectedDisconnect = event.code !== 1000 && event.code !== 1001;
+                    
+                    if (isUnexpectedDisconnect) {
+                        console.log(`WebSocket disconnected unexpectedly (code: ${event.code})`);
+                        // Only show notification for truly unexpected disconnects (server issues, network problems)
+                        if (event.code === 1006 || event.code === 1011 || event.code > 4000) {
+                            showNotification('warning', 'Connection Lost', 'Attempting to reconnect...', 3000);
+                        }
+                    }
+
+                    // Only attempt reconnection for unexpected disconnects when page is visible
+                    if (isUnexpectedDisconnect && reconnectAttempts < maxReconnectAttempts && !isNavigating) {
+                        reconnectAttempts++;
+                        const delay = Math.min(1000 * reconnectAttempts, 5000);
+                        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts})`);
+                        reconnectTimeout = setTimeout(() => {
+                            if (!isNavigating && isPageVisible) {
+                                connectWebSocket();
+                            }
+                        }, delay);
+                    } else if (isUnexpectedDisconnect && !isNavigating) {
+                        console.log('Max reconnection attempts reached');
+                        showNotification('error', 'Connection Failed', 'Please refresh the page to reconnect', 0);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    if (!isNavigating) {
+                        console.error('WebSocket error:', error);
+                    }
+                    isConnecting = false;
+                };
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                isConnecting = false;
+            }
+        }
+
+        // Initialize WebSocket connection
+        connectWebSocket();
+
+        // Clean up on page unload
+        // window.addEventListener('beforeunload', function() {
+        //     stopHeartbeat();
+        //     if (reconnectTimeout) {
+        //         clearTimeout(reconnectTimeout);
+        //     }
+        //     if (ws && ws.readyState === WebSocket.OPEN) {
+        //         ws.close(1000, 'Page unloading');
+        //     }
+        // });
+
+        // ws.onmessage = function(event) {
+        //     try {
+        //         const data = JSON.parse(event.data);
+        //         if (data.type === 'music_update' && data.data.guildId === '<%= guild.id %>') {
+        //             console.log('Processing music update:', data.data);
+        //             // Add a small delay to ensure DOM is ready
+        //             setTimeout(() => {
+        //                 updateMusicUI(data.data);
+        //             }, 50);
+        //         } else if (data.type === 'pong') {
+        //             // Handle pong response
+        //             console.log('WebSocket pong received');
+        //         }
+        //     } catch (error) {
+        //         console.error('WebSocket message error:', error);
+        //     }
+        // };
+
+        // // Send periodic heartbeat to maintain connection
+        // let heartbeatInterval;
+
+        // function startHeartbeat() {
+        //     heartbeatInterval = setInterval(() => {
+        //         if (ws && ws.readyState === WebSocket.OPEN) {
+        //             ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+        //         }
+        //     }, 25000); // Send ping every 25 seconds
+        // }
+
+        // function stopHeartbeat() {
+        //     if (heartbeatInterval) {
+        //         clearInterval(heartbeatInterval);
+        //         heartbeatInterval = null;
+        //     }
+        // }
 
         // Add song form
         document.getElementById('addSongForm').addEventListener('submit', async function(e) {
@@ -757,7 +901,7 @@
             try {
                 const response = await fetch(`/api/dashboard/<%= guild.id %>/music/queue`);
                 const data = await response.json();
-                updateMusicUI(data);
+                updateMusicDisplay(data); // Use updateMusicDisplay here
             } catch (error) {
                 console.error('Error updating queue:', error);
             }
@@ -777,7 +921,7 @@
             return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
         }
 
-        function updateMusicUI(data) {
+        function updateMusicDisplay(data) {
             console.log('Updating UI with:', data);
             // Store current state globally for button logic
             window.currentMusicState = {
@@ -932,7 +1076,7 @@
         // Function to fetch current position from server
         async function fetchCurrentPosition() {
             try {
-                const response = await fetch(`/api/dashboard/<%= guild.id %>/music/position`);
+                const response = await fetch(`/api/music/position?guildId=<%= guild.id %>`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {

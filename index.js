@@ -120,7 +120,7 @@ app.use((req, res, next) => {
 
 // Session configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -190,13 +190,16 @@ app.use('/dashboard', dashboardRoutes);
 app.use('/api', apiRoutes);
 
 // WebSocket connection
-wss.on('connection', (ws) => {
-    console.log('WebSocket client connected');
+wss.on('connection', (ws, req) => {
+    const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log(`WebSocket client connected from ${clientIP}`);
     
     // Set up ping interval for this connection
     const pingInterval = setInterval(() => {
-        if (ws.readyState === 1) {
+        if (ws.readyState === WebSocket.OPEN) {
             ws.ping();
+        } else {
+            clearInterval(pingInterval);
         }
     }, 30000); // Ping every 30 seconds
     
@@ -223,8 +226,11 @@ wss.on('connection', (ws) => {
         ws.isAlive = true;
     });
     
-    ws.on('close', () => {
-        console.log('WebSocket client disconnected');
+    ws.on('close', (code, reason) => {
+        // Only log disconnects for unexpected closures
+        if (code !== 1000 && code !== 1001) {
+            console.log(`WebSocket client disconnected (code: ${code}, reason: ${reason})`);
+        }
         clearInterval(pingInterval);
     });
     

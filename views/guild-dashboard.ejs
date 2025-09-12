@@ -362,7 +362,17 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
+
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         /* Member card styles */
         .member-card {
             background-color: var(--sidebar-bg);
@@ -862,7 +872,7 @@
         let maxReconnectAttempts = 5;
         let reconnectInterval = 2000;
         let connectionCheckInterval = null;
-        
+
         // Connection status indicator
         function updateConnectionStatus(connected) {
             wsConnected = connected;
@@ -880,7 +890,7 @@
                     `;
                 }
             }
-            
+
             // Show offline overlay when disconnected
             if (!connected) {
                 showOfflineOverlay();
@@ -888,7 +898,7 @@
                 hideOfflineOverlay();
             }
         }
-        
+
         // Create offline overlay
         function createOfflineOverlay() {
             const overlay = document.createElement('div');
@@ -908,7 +918,7 @@
                 color: white;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             `;
-            
+
             overlay.innerHTML = `
                 <div style="text-align: center; background: #2f3136; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
                     <i class="fas fa-wifi-slash" style="font-size: 48px; color: #ff6b6b; margin-bottom: 20px;"></i>
@@ -925,11 +935,11 @@
                     <div id="reconnect-status" style="margin-top: 15px; font-size: 14px; opacity: 0.7;"></div>
                 </div>
             `;
-            
+
             document.body.appendChild(overlay);
             return overlay;
         }
-        
+
         function showOfflineOverlay() {
             let overlay = document.getElementById('offline-overlay');
             if (!overlay) {
@@ -937,40 +947,40 @@
             }
             overlay.style.display = 'flex';
         }
-        
+
         function hideOfflineOverlay() {
             const overlay = document.getElementById('offline-overlay');
             if (overlay) {
                 overlay.style.display = 'none';
             }
         }
-        
+
         // WebSocket connection functions
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}`;
-            
+
             try {
                 ws = new WebSocket(wsUrl);
-                
+
                 ws.onopen = function() {
                     console.log('WebSocket connected');
                     updateConnectionStatus(true);
                     reconnectAttempts = 0;
-                    
+
                     // Subscribe to guild updates
                     ws.send(JSON.stringify({
                         type: 'subscribe',
                         guildId: '<%= guild.id %>'
                     }));
-                    
+
                     // Update reconnect status
                     const reconnectStatus = document.getElementById('reconnect-status');
                     if (reconnectStatus) {
                         reconnectStatus.textContent = '';
                     }
                 };
-                
+
                 ws.onmessage = function(event) {
                     try {
                         const data = JSON.parse(event.data);
@@ -979,11 +989,11 @@
                         console.error('Error parsing WebSocket message:', error);
                     }
                 };
-                
+
                 ws.onclose = function(event) {
                     console.log('WebSocket disconnected:', event.code, event.reason);
                     updateConnectionStatus(false);
-                    
+
                     // Attempt to reconnect
                     if (reconnectAttempts < maxReconnectAttempts) {
                         setTimeout(() => {
@@ -1002,42 +1012,52 @@
                         }
                     }
                 };
-                
+
                 ws.onerror = function(error) {
                     console.error('WebSocket error:', error);
                     updateConnectionStatus(false);
                 };
-                
+
             } catch (error) {
                 console.error('Failed to create WebSocket connection:', error);
                 updateConnectionStatus(false);
             }
         }
-        
+
         function attemptReconnect() {
             const reconnectStatus = document.getElementById('reconnect-status');
             if (reconnectStatus) {
                 reconnectStatus.textContent = 'Attempting to reconnect...';
             }
-            
+
             reconnectAttempts = 0;
             reconnectInterval = 2000;
             connectWebSocket();
         }
-        
+
         function handleWebSocketMessage(data) {
             // Handle real-time updates from server
             switch (data.type) {
+                case 'audit_log':
+                    // Add new audit log entry to the table if we're on the logs section
+                    const currentSection = document.querySelector('.section[style*="display: block"], .section.active');
+                    if (currentSection && currentSection.id === 'logs') {
+                        if (data.data) {
+                            console.log('Received audit log:', data.data);
+                            addNewAuditLogEntry(data.data);
+                        }
+                    }
+                    break;
                 case 'audit_log_update':
                     // Refresh audit logs if we're on the logs section
-                    const currentSection = document.querySelector('.section[style="display: block;"]');
-                    if (currentSection && currentSection.id === 'logs') {
+                    const logsSection = document.querySelector('#logs[style*="display: block"], #logs.active');
+                    if (logsSection) {
                         loadAuditLogs(auditCurrentPage, auditCurrentFilters);
                     }
                     break;
                 case 'member_update':
                     // Refresh members if we're on the members section
-                    const memberSection = document.querySelector('#members[style="display: block;"]');
+                    const memberSection = document.querySelector('#members[style*="display: block"], #members.active');
                     if (memberSection) {
                         loadMembersData(1, false);
                     }
@@ -1048,13 +1068,75 @@
                     break;
             }
         }
-        
+
+        // Function to add new audit log entry in real-time
+        function addNewAuditLogEntry(logData) {
+            const tbody = document.getElementById('audit-logs-tbody');
+            if (!tbody) return;
+
+            // Check if we're currently viewing the logs section
+            const logsSection = document.getElementById('logs');
+            if (!logsSection || logsSection.style.display === 'none') {
+                return; // Don't add entries if not viewing logs
+            }
+
+            // Check if table is empty (showing "no logs" message)
+            const existingRows = tbody.querySelectorAll('tr');
+            if (existingRows.length === 1 && existingRows[0].querySelector('td[colspan="6"]')) {
+                tbody.innerHTML = '';
+            }
+
+            const categoryColor = logData.category === 'MODERATION' ? 'danger' : 
+                                 logData.category === 'MEMBER' ? 'info' : 
+                                 logData.category === 'MESSAGE' ? 'warning' : 
+                                 logData.category === 'MUSIC' ? 'success' : 'secondary';
+
+            const row = document.createElement('tr');
+            row.style.animation = 'fadeIn 0.5s ease-in';
+            row.innerHTML = `
+                <td>
+                    <span class="badge bg-${categoryColor}">${logData.category}</span>
+                </td>
+                <td><strong>${logData.action}</strong></td>
+                <td>${logData.moderator || 'System'}</td>
+                <td>${logData.target || '-'}</td>
+                <td>${logData.reason || '-'}</td>
+                <td class="text-muted small">
+                    ${new Date(logData.timestamp).toLocaleString()}
+                </td>
+            `;
+
+            // Insert at the top of the table
+            tbody.insertBefore(row, tbody.firstChild);
+
+            // Limit to 50 rows to prevent memory issues
+            const rows = tbody.querySelectorAll('tr');
+            if (rows.length > 50) {
+                tbody.removeChild(rows[rows.length - 1]);
+            }
+
+            // Show live update indicator
+            const liveIndicator = document.getElementById('live-indicator');
+            if (liveIndicator) {
+                liveIndicator.innerHTML = `
+                            <i class="fas fa-circle text-success"></i>
+                            <small class="text-success">Live Update</small>
+                        `;
+                        setTimeout(() => {
+                            liveIndicator.innerHTML = `
+                            <small class="text-success">Live</small>
+                        `;
+                    }
+                }, 2000);
+            }
+        }
+
         // Connection health check
         function startConnectionHealthCheck() {
             connectionCheckInterval = setInterval(() => {
                 if (!wsConnected || !ws || ws.readyState !== WebSocket.OPEN) {
                     updateConnectionStatus(false);
-                    
+
                     // Try to reconnect if not already trying
                     if (reconnectAttempts === 0) {
                         attemptReconnect();
@@ -1070,7 +1152,7 @@
                 }
             }, 5000); // Check every 5 seconds
         }
-        
+
         // Test server connectivity
         async function testServerConnection() {
             try {
@@ -1084,7 +1166,7 @@
                 return false;
             }
         }
-        
+
         // Enhanced fetch with connection checking
         async function fetchWithConnectionCheck(url, options = {}) {
             try {
@@ -1092,20 +1174,20 @@
                     ...options,
                     timeout: 10000
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 return response;
             } catch (error) {
                 console.error('Fetch failed:', error);
-                
+
                 // Check if it's a network error
                 if (error.name === 'TypeError' || error.message.includes('Failed to fetch')) {
                     updateConnectionStatus(false);
                 }
-                
+
                 throw error;
             }
         }
@@ -1162,30 +1244,30 @@
             document.querySelectorAll('.section').forEach(section => {
                 section.style.display = 'none';
             });
-            
+
             // Remove active class from all nav links
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.remove('active');
             });
-            
+
             // Show target section
             const targetSection = document.getElementById(sectionName);
             if (targetSection) {
                 targetSection.style.display = 'block';
             }
-            
+
             // Add active class to clicked nav link
             const activeLink = document.querySelector(`[data-section="${sectionName}"]`);
             if (activeLink) {
                 activeLink.classList.add('active');
             }
-            
+
             // Load section-specific data
             if (sectionName === 'members') {
                 initializeMemberView();
                 loadMembersData();
             } else if (sectionName === 'logs') {
-                // Load logs with current filters when switching to logs section
+                // Load logs when switching to logs section
                 loadAuditLogs(1, {});
             }
         }
@@ -1203,19 +1285,19 @@
             // Add infinite scroll for members
             const membersTable = document.getElementById('table-view');
             const membersCards = document.getElementById('card-view');
-            
+
             function checkScroll() {
                 const container = currentView === 'table' ? membersTable : membersCards;
                 if (!container || !hasMoreMembers || isLoading) return;
-                
+
                 const scrollPosition = window.innerHeight + window.scrollY;
                 const threshold = document.body.offsetHeight - 1000;
-                
+
                 if (scrollPosition >= threshold) {
                     loadMembersData(currentPage + 1, true);
                 }
             }
-            
+
             window.addEventListener('scroll', checkScroll);
 
             // Add member filter handlers
@@ -1280,11 +1362,11 @@
                     }
                 });
             }
-            
+
             // Initialize WebSocket connection
             connectWebSocket();
             startConnectionHealthCheck();
-            
+
             // Load initial data
             loadGuildRoles();
             initializeMemberView();
@@ -1295,7 +1377,7 @@
             if (saveOverviewBtn) {
                 saveOverviewBtn.addEventListener('click', async function() {
                     const prefix = document.getElementById('prefix').value;
-                    
+
                     try {
                         this.classList.add('loading');
                         const response = await fetch(`/api/dashboard/<%= guild.id %>/config`, {
@@ -1303,7 +1385,7 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ prefix })
                         });
-                        
+
                         const result = await response.json();
                         if (result.success) {
                             showNotification('success', 'Settings Saved!', 'Configuration updated successfully');
@@ -1317,7 +1399,7 @@
                     }
                 });
             }
-            
+
             // Cleanup on page unload
             window.addEventListener('beforeunload', function() {
                 if (connectionCheckInterval) {
@@ -1360,7 +1442,7 @@
         // Load members data with pagination
         async function loadMembersData(page = 1, append = false) {
             if (isLoading) return;
-            
+
             try {
                 isLoading = true;
                 const params = new URLSearchParams({
@@ -1373,19 +1455,19 @@
 
                 const response = await fetchWithConnectionCheck(`/api/dashboard/<%= guild.id %>/members?${params}`);
                 const data = await response.json();
-                
+
                 if (append) {
                     currentMembers = [...currentMembers, ...(data.members || [])];
                 } else {
                     currentMembers = data.members || [];
                 }
-                
+
                 displayMembers(currentMembers);
                 updateMemberCount(data.pagination?.totalMembers || 0);
-                
+
                 hasMoreMembers = data.pagination?.hasNext || false;
                 currentPage = page;
-                
+
             } catch (error) {
                 console.error('Error loading members:', error);
                 if (!append) {
@@ -1821,7 +1903,7 @@
         function showRoleManagementModal() {
             closeModerationModal();
             document.getElementById('roleModalMemberName').textContent = currentMemberUsername;
-            
+
             // Reset checkboxes and set based on current roles (need to fetch this info or pass it)
             const member = currentMembers.find(m => m.id === currentMemberId);
             if (member) {
@@ -1938,7 +2020,7 @@
 
             try {
                 showNotification('info', `Submitting ${action.charAt(0).toUpperCase() + action.slice(1)} Request...`, `Your ${action} request has been sent.`);
-                
+
                 let url = `/api/dashboard/<%= guild.id %>/member/${currentMemberId}/${action}-request`;
                 let method = 'POST';
                 let body = JSON.stringify({ reason });

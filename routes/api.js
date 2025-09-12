@@ -794,6 +794,54 @@ router.get('/dashboard/:guildId/music/position', ensureDjOrAdmin, async (req, re
     }
 });
 
+// Music position endpoint for direct access
+router.get('/music/position', ensureAuthenticated, async (req, res) => {
+    const guildId = req.query.guildId;
+    
+    if (!guildId) {
+        return res.status(400).json({ error: 'Guild ID is required' });
+    }
+
+    // Check if user has access to this guild
+    const userGuild = req.user.guilds.find(g => g.id === guildId);
+    if (!userGuild) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    try {
+        const musicQueue = getMusicQueue(guildId);
+        const managerInstance = manager();
+        let position = 0;
+        let duration = 0;
+        let isPlaying = false;
+
+        if (managerInstance) {
+            const player = managerInstance.getPlayer(guildId);
+            if (player && player.connected && player.queue && player.queue.current) {
+                position = player.position || 0;
+                duration = player.queue.current.info.length || 0;
+                isPlaying = !player.paused;
+            }
+        }
+
+        // Get duration from current song if available
+        if (musicQueue.currentSong && musicQueue.currentSong.duration) {
+            duration = musicQueue.currentSong.duration * 1000; // Convert to milliseconds
+        }
+
+        res.json({
+            success: true,
+            position: Math.floor(position / 1000), // Convert to seconds
+            duration: Math.floor(duration / 1000), // Convert to seconds
+            isPlaying: isPlaying,
+            currentSong: musicQueue.currentSong
+        });
+    } catch (error) {
+        console.error('Error getting position:', error);
+        res.status(500).json({ error: 'Failed to get position' });
+    }
+});
+
 // Get guild roles
 router.get('/dashboard/:guildId/roles', ensureRole, async (req, res) => {
     const { guildId } = req.params;

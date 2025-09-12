@@ -113,10 +113,13 @@ async function handleApprovalInteraction(interaction) {
 
         if (!approvalData) {
             return interaction.reply({
-                content: 'This approval request has expired or is no longer valid.',
+                content: 'This approval request has already been processed or expired.',
                 ephemeral: true
             });
         }
+
+        // Remove from pending approvals immediately to prevent duplicate processing
+        pendingApprovals.delete(approvalId);
 
         if (action === 'approve') {
             // Execute the kick/ban
@@ -139,6 +142,8 @@ async function handleApprovalInteraction(interaction) {
                     components: []
                 });
             } else {
+                // Re-add to pending approvals if execution failed
+                pendingApprovals.set(approvalId, approvalData);
                 await interaction.reply({
                     content: `Failed to execute ${type}. The user may have left the server or an error occurred.`,
                     ephemeral: true
@@ -163,16 +168,21 @@ async function handleApprovalInteraction(interaction) {
             });
         }
 
-        // Remove from pending approvals
-        pendingApprovals.delete(approvalId);
-
     } catch (error) {
         console.error('Error handling approval interaction:', error);
+        
+        // Re-add to pending approvals if there was an error
+        if (approvalData) {
+            pendingApprovals.set(approvalId, approvalData);
+        }
+        
         try {
-            await interaction.reply({
-                content: 'An error occurred while processing your request.',
-                ephemeral: true
-            });
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({
+                    content: 'An error occurred while processing your request.',
+                    ephemeral: true
+                });
+            }
         } catch (replyError) {
             console.error('Error sending error reply:', replyError);
         }
