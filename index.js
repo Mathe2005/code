@@ -191,13 +191,64 @@ app.use('/api', apiRoutes);
 
 // WebSocket connection
 wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    
+    // Set up ping interval for this connection
+    const pingInterval = setInterval(() => {
+        if (ws.readyState === 1) {
+            ws.ping();
+        }
+    }, 30000); // Ping every 30 seconds
+    
     ws.on('message', (message) => {
-        const data = JSON.parse(message);
-        if (data.type === 'subscribe' && data.guildId) {
-            ws.guildId = data.guildId;
+        try {
+            const data = JSON.parse(message);
+            
+            if (data.type === 'subscribe' && data.guildId) {
+                ws.guildId = data.guildId;
+                console.log(`WebSocket subscribed to guild: ${data.guildId}`);
+            }
+            
+            if (data.type === 'ping') {
+                // Respond to ping with pong
+                ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+            }
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
         }
     });
+    
+    ws.on('pong', () => {
+        // Client responded to our ping
+        ws.isAlive = true;
+    });
+    
+    ws.on('close', () => {
+        console.log('WebSocket client disconnected');
+        clearInterval(pingInterval);
+    });
+    
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+        clearInterval(pingInterval);
+    });
+    
+    // Set initial alive status
+    ws.isAlive = true;
 });
+
+// Clean up dead connections every minute
+setInterval(() => {
+    wss.clients.forEach(ws => {
+        if (!ws.isAlive) {
+            console.log('Terminating dead WebSocket connection');
+            return ws.terminate();
+        }
+        
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 60000);
 
 // Global error handlers for anti-crash protection
 process.on('uncaughtException', (error) => {

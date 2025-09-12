@@ -97,6 +97,27 @@ router.get('/:guildId', ensureRole, async (req, res) => {
     // Fetch members to ensure we have the latest data
     await guild.members.fetch({ limit: 1000, force: false });
 
+    // Get members data for the members section
+    let members = Array.from(guild.members.cache.values());
+    members = members.filter(member => !member.user.bot);
+
+    // Get a subset of members for display (first 20)
+    const displayMembers = members.slice(0, 20).map(member => ({
+        id: member.user.id,
+        username: member.user.username,
+        nickname: member.nickname,
+        tag: member.user.tag,
+        avatar: member.user.displayAvatarURL(),
+        joinedAt: member.joinedTimestamp,
+        roles: member.roles.cache.filter(role => role.id !== guild.id).map(role => ({
+            id: role.id,
+            name: role.name,
+            color: role.hexColor
+        })),
+        isBot: member.user.bot,
+        status: member.presence?.status || 'offline'
+    }));
+
     const realMemberCount = guild.members.cache.filter(member => !member.user.bot).size;
     const onlineRealMembers = guild.members.cache.filter(m => !m.user.bot && m.presence?.status !== 'offline').size;
 
@@ -106,14 +127,19 @@ router.get('/:guildId', ensureRole, async (req, res) => {
         memberCount: realMemberCount,
         onlineCount: onlineRealMembers,
         channels: guild.channels.cache.filter(c => c.type === 0).map(c => ({ id: c.id, name: c.name })),
-        roles: guild.roles.cache.map(r => ({ id: r.id, name: r.name }))
+        roles: guild.roles.cache.filter(role => role.id !== guild.id).map(role => ({
+            id: role.id,
+            name: role.name,
+            color: role.hexColor
+        }))
     };
 
     res.render('guild-dashboard', {
         user: req.user,
         guild: guildData,
         config,
-        logs
+        logs,
+        members: displayMembers
     });
 });
 
@@ -272,7 +298,7 @@ router.get('/:guildId/members', ensureRole, async (req, res) => {
             guild: guildData,
             members: membersData,
             pagination: {
-                current: page,
+                current: parseInt(page),
                 total: Math.ceil(totalMembers / limit),
                 hasNext: offset + limit < totalMembers,
                 hasPrev: page > 1,

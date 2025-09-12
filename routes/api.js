@@ -11,28 +11,49 @@ const { getRealIP, createAdvancedRateLimit } = require('../middleware/security')
 // Add this at the top after the imports
 let wss;
 
-function setWebSocketServer(webSocketServer) {
-    wss = webSocketServer;
+// Set WebSocket server reference
+function setWebSocketServer(websocketServer) {
+    wss = websocketServer;
 }
+
+// Broadcast function for real-time updates
+function broadcastToGuild(guildId, data) {
+    if (!wss) return;
+
+    wss.clients.forEach(client => {
+        if (client.readyState === 1 && client.guildId === guildId) {
+            client.send(JSON.stringify(data));
+        }
+    });
+}
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
 
 // API security monitoring middleware
 router.use((req, res, next) => {
     const ip = getRealIP(req);
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const endpoint = req.path;
-    
+
     // Log API access for monitoring
     if (req.user) {
         console.log(`📊 API Access: ${req.user.username} from ${ip} -> ${req.method} ${endpoint}`);
     } else {
         console.log(`📊 Unauthenticated API Access: ${ip} -> ${req.method} ${endpoint}`);
     }
-    
+
     // Set response time header for monitoring
     const startTime = Date.now();
     res.on('finish', () => {
         const responseTime = Date.now() - startTime;
-        
+
         // Only set header if response hasn't been sent yet
         if (!res.headersSent) {
             try {
@@ -41,13 +62,13 @@ router.use((req, res, next) => {
                 // Ignore header setting errors
             }
         }
-        
+
         // Log slow responses
         if (responseTime > 5000) {
             console.log(`⚠️ Slow API Response: ${endpoint} took ${responseTime}ms for ${ip}`);
         }
     });
-    
+
     next();
 });
 
@@ -938,7 +959,7 @@ router.get('/dashboard/:guildId/logs', ensureRole, async (req, res) => {
     try {
         const { sequelize } = require('../config/database');
         const { Op } = require('sequelize');
-        
+
         // Import AuditLog model properly - use the export from auditLogger
         const { AuditLog } = require('../utils/auditLogger');
 
@@ -1062,30 +1083,25 @@ router.post('/dashboard/:guildId/config', ensureRole, async (req, res) => {
     }
 
     try {
-        const guild = client.guilds.cache.get(guildId);
-        if (!guild) {
-            return res.status(404).json({ error: 'Guild not found' });
-        }
-
         const config = await getOrCreateGuildConfig(guildId);
 
-        // Track if role configs are being changed
-        const oldRoleConfigs = config.roleConfigs;
-        let roleConfigsChanged = false;
-
-        // Update configuration fields
-        if (prefix !== undefined) config.prefix = prefix;
-        if (logChannel !== undefined) config.logChannel = logChannel;
-        if (specialSuffix !== undefined) config.specialSuffix = specialSuffix;
+        if (prefix !== undefined) {
+            config.prefix = prefix;
+        }
+        if (logChannel !== undefined) {
+            config.logChannel = logChannel;
+        }
+        if (specialSuffix !== undefined) {
+            config.specialSuffix = specialSuffix;
+        }
         if (roleConfigs !== undefined) {
             const newRoleConfigs = Array.isArray(roleConfigs) ? roleConfigs : [];
-            
+
             // Check if role configs actually changed
-            const oldConfigsStr = JSON.stringify(oldRoleConfigs);
+            const oldConfigsStr = JSON.stringify(config.roleConfigs);
             const newConfigsStr = JSON.stringify(newRoleConfigs);
-            
+
             if (oldConfigsStr !== newConfigsStr) {
-                roleConfigsChanged = true;
                 config.roleConfigs = newRoleConfigs;
             }
         }
@@ -1093,9 +1109,9 @@ router.post('/dashboard/:guildId/config', ensureRole, async (req, res) => {
         await config.save();
 
         // If role configurations changed, apply to all members with configured roles
-        if (roleConfigsChanged) {
+        if (config.changedProperties && config.changedProperties.includes('roleConfigs')) {
             const { updateAllMembersWithConfiguredRoles } = require('../utils/guildUtils');
-            
+
             // Parse the new role configs
             let parsedRoleConfigs = config.roleConfigs;
             if (typeof parsedRoleConfigs === 'string') {
@@ -1117,7 +1133,7 @@ router.post('/dashboard/:guildId/config', ensureRole, async (req, res) => {
             tag: `${req.user.username}#${req.user.discriminator || '0000'}`
         };
 
-        const logMessage = roleConfigsChanged ? 
+        const logMessage = config.changedProperties && config.changedProperties.includes('roleConfigs') ?
             'Configuration updated and applied to all relevant members via dashboard' :
             'Configuration updated via dashboard';
 
@@ -1125,7 +1141,7 @@ router.post('/dashboard/:guildId/config', ensureRole, async (req, res) => {
 
         res.json({
             success: true,
-            message: roleConfigsChanged ? 
+            message: config.changedProperties && config.changedProperties.includes('roleConfigs') ?
                 'Configuration updated and applied to all relevant members' :
                 'Configuration updated successfully',
             config: {
@@ -1207,7 +1223,7 @@ router.post('/dashboard/:guildId/member/:memberId/role', ensureRole, async (req,
             tag: `${req.user.username}#${req.user.discriminator || '0000'}`
         };
 
-        await logAction(guildId, action === 'add' ? 'ROLE_ADD' : 'ROLE_REMOVE', moderator, member.user, 
+        await logAction(guildId, action === 'add' ? 'ROLE_ADD' : 'ROLE_REMOVE', moderator, member.user,
             `Role ${actionTaken}: ${role.name}`, {}, wss);
 
         res.json({
@@ -1250,53 +1266,30 @@ router.post('/dashboard/:guildId/member/:memberId/nickname', ensureRole, async (
             return res.status(404).json({ error: 'Member not found' });
         }
 
-        // Check if we can change this member's nickname
-        if (member.id === guild.ownerId) {
-            return res.status(403).json({ error: 'Cannot change server owner\'s nickname' });
+        const userMember = await guild.members.fetch(req.user.id);
+        if (member.roles.highest.position >= userMember.roles.highest.position && guild.ownerId !== req.user.id) {
+            return res.status(403).json({ error: 'Cannot change nickname: Member has higher or equal roles to you' });
         }
 
-        const botMember = guild.members.me;
-        if (member.roles.highest.position >= botMember.roles.highest.position) {
-            return res.status(403).json({ error: 'Cannot change nickname: Member has higher or equal roles to bot' });
-        }
-
-        const oldNickname = member.nickname;
         const newNickname = nickname && nickname.trim() ? nickname.trim() : null;
-
-        // Validate nickname length
-        if (newNickname && newNickname.length > 32) {
-            return res.status(400).json({ error: 'Nickname cannot be longer than 32 characters' });
-        }
 
         await member.setNickname(newNickname);
 
-        // Save custom nickname to database if provided
-        if (newNickname) {
-            const { saveCustomNickname } = require('../utils/guildUtils');
-            await saveCustomNickname(member.user.id, guildId, newNickname);
-        } else {
-            const { deleteCustomNickname } = require('../utils/guildUtils');
-            await deleteCustomNickname(member.user.id, guildId);
-        }
-
-        // Log the nickname change
         const moderator = {
             id: req.user.id,
             tag: `${req.user.username}#${req.user.discriminator || '0000'}`
         };
 
-        await logAction(guildId, 'NICKNAME_CHANGE', moderator, member.user, 
-            `Nickname changed from "${oldNickname || 'None'}" to "${newNickname || 'None'}"`, {}, wss);
+        await logAction(guildId, 'NICKNAME_CHANGE', moderator, member.user, `Nickname changed to: ${newNickname || 'None'}`, {}, wss);
 
         res.json({
             success: true,
-            message: 'Nickname changed successfully',
-            oldNickname: oldNickname,
-            newNickname: newNickname
+            message: 'Nickname updated successfully',
+            nickname: newNickname
         });
     } catch (error) {
-        console.error('Error changing member nickname:', error);
-        res.status(500).json({ error: 'Failed to change nickname: ' + error.message });
+        console.error('Error updating nickname:', error);
+        res.status(500).json({ error: 'Failed to update nickname: ' + error.message });
     }
 });
 
@@ -1341,7 +1334,7 @@ router.post('/dashboard/:guildId/member/:memberId/kick', ensureRole, async (req,
         }
 
         const kickReason = reason && reason.trim() ? reason.trim() : 'No reason provided';
-        
+
         await member.kick(kickReason);
 
         // Log the kick
@@ -1411,9 +1404,9 @@ router.post('/dashboard/:guildId/refresh-nicknames', ensureRole, async (req, res
 
         await logAction(guildId, 'NICKNAME_REFRESH', moderator, null, 'Manual nickname refresh triggered via dashboard', {}, wss);
 
-        res.json({ 
-            success: true, 
-            message: 'All member nicknames have been refreshed' 
+        res.json({
+            success: true,
+            message: 'All member nicknames have been refreshed'
         });
 
     } catch (error) {
@@ -1457,7 +1450,7 @@ router.post('/dashboard/:guildId/member/:memberId/kick-request', ensureRole, asy
         // Send approval request to designated channel
         const approvalChannelId = '1412210403701817446';
         const approvalChannel = guild.channels.cache.get(approvalChannelId);
-        
+
         if (!approvalChannel) {
             return res.status(500).json({ error: 'Approval channel not found' });
         }
@@ -1506,7 +1499,7 @@ router.post('/dashboard/:guildId/member/:memberId/ban-request', ensureRole, asyn
 
         let member;
         let user;
-        
+
         try {
             member = await guild.members.fetch(memberId);
             user = member.user;
@@ -1528,7 +1521,7 @@ router.post('/dashboard/:guildId/member/:memberId/ban-request', ensureRole, asyn
         // Send approval request to designated channel
         const approvalChannelId = '1412210403701817446';
         const approvalChannel = guild.channels.cache.get(approvalChannelId);
-        
+
         if (!approvalChannel) {
             return res.status(500).json({ error: 'Approval channel not found' });
         }
@@ -1578,7 +1571,7 @@ router.post('/dashboard/:guildId/member/:memberId/ban', ensureRole, async (req, 
 
         let member;
         let user;
-        
+
         try {
             member = await guild.members.fetch(memberId);
             user = member.user;
@@ -1610,8 +1603,8 @@ router.post('/dashboard/:guildId/member/:memberId/ban', ensureRole, async (req, 
 
         const banReason = reason && reason.trim() ? reason.trim() : 'No reason provided';
         const deleteMessageDays = deleteMessages ? 7 : 0;
-        
-        await guild.members.ban(user, { 
+
+        await guild.members.ban(user, {
             reason: banReason,
             deleteMessageDays: deleteMessageDays
         });
