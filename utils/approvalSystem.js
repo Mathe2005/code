@@ -1,4 +1,3 @@
-
 const Discord = require('discord.js');
 const client = require('../config/discord');
 
@@ -64,16 +63,33 @@ async function sendApprovalRequest(channel, requestData) {
             timestamp: Date.now()
         });
 
-        // Auto-delete after 24 hours
+        // Auto-expire after 24 hours
         setTimeout(async () => {
             try {
                 if (pendingApprovals.has(approvalId)) {
-                    await message.delete();
                     pendingApprovals.delete(approvalId);
-                    console.log(`Auto-deleted expired ${type} request for ${targetTag}`);
+
+                    const expiredEmbed = new Discord.EmbedBuilder()
+                        .setTitle(`${type.toUpperCase()} REQUEST EXPIRED ⏰`)
+                        .setColor('#6c757d')
+                        .addFields(
+                            { name: 'Target User', value: `${targetUsername} (${targetTag})`, inline: true },
+                            { name: 'Requested By', value: requesterTag, inline: true },
+                            { name: 'Reason', value: reason || 'No reason provided', inline: false },
+                            { name: 'Status', value: '⏰ Request expired after 24 hours', inline: false }
+                        )
+                        .setTimestamp()
+                        .setFooter({ text: 'Request expired' });
+
+                    await message.edit({
+                        embeds: [expiredEmbed],
+                        components: []
+                    });
+
+                    console.log(`Auto-expired ${type} request for ${targetTag}`);
                 }
             } catch (error) {
-                console.error('Error auto-deleting approval request:', error);
+                console.error('Error auto-expiring approval request:', error);
             }
         }, 24 * 60 * 60 * 1000); // 24 hours
 
@@ -88,15 +104,24 @@ async function handleApprovalInteraction(interaction) {
     try {
         if (!interaction.isButton()) return;
 
-        const [action, type, targetId, guildId, timestamp] = interaction.customId.split('_');
-        if (!['approve', 'decline'].includes(action) || !['kick', 'ban'].includes(type)) return;
+        const customIdParts = interaction.customId.split('_');
+        if (customIdParts.length < 5) {
+            console.error('Invalid custom ID format:', interaction.customId);
+            return;
+        }
+
+        const [action, type, targetId, guildId, timestamp] = customIdParts;
+        if (!['approve', 'decline'].includes(action) || !['kick', 'ban'].includes(type)) {
+            console.error('Invalid action or type:', action, type);
+            return;
+        }
 
         // Check if user has permission to approve/decline
         const member = interaction.member;
         if (!member) {
             return interaction.reply({
                 content: 'Error: Could not verify your permissions.',
-                ephemeral: true
+                flags: Discord.MessageFlags.Ephemeral
             });
         }
 
@@ -104,65 +129,89 @@ async function handleApprovalInteraction(interaction) {
         if (!hasPermission) {
             return interaction.reply({
                 content: 'You do not have permission to approve/decline moderation requests.',
-                ephemeral: true
+                flags: Discord.MessageFlags.Ephemeral
             });
         }
 
         const approvalId = `${type}_${targetId}_${guildId}_${timestamp}`;
+        console.log(`Looking for approval ID: ${approvalId}`);
+        console.log(`Available approval IDs:`, Array.from(pendingApprovals.keys()));
+
         const approvalData = pendingApprovals.get(approvalId);
 
         if (!approvalData) {
+            console.error(`Approval not found for ID: ${approvalId}`);
             return interaction.reply({
                 content: 'This approval request has already been processed or expired.',
-                ephemeral: true
+                flags: Discord.MessageFlags.Ephemeral
             });
         }
 
-        // Remove from pending approvals immediately to prevent duplicate processing
-        pendingApprovals.delete(approvalId);
+        // Defer the reply to give us more time to process
+        await interaction.deferUpdate();
 
         if (action === 'approve') {
             // Execute the kick/ban
             const success = await executeModeration(approvalData, interaction.user);
-            
+
             if (success) {
+                // Remove from pending approvals after successful execution
+                pendingApprovals.delete(approvalId);
+
                 const embed = new Discord.EmbedBuilder()
-                    .setTitle(`${type.toUpperCase()} APPROVED & EXECUTED`)
+                    .setTitle(`${type.toUpperCase()} APPROVED & EXECUTED ✅`)
                     .setColor('#00FF00')
                     .addFields(
                         { name: 'Target User', value: `${approvalData.targetUsername} (${approvalData.targetTag})`, inline: true },
                         { name: 'Requested By', value: approvalData.requesterTag, inline: true },
                         { name: 'Approved By', value: `${interaction.user.username}#${interaction.user.discriminator}`, inline: true },
-                        { name: 'Reason', value: approvalData.reason, inline: false }
+                        { name: 'Reason', value: approvalData.reason, inline: false },
+                        { name: 'Status', value: `✅ ${type.charAt(0).toUpperCase() + type.slice(1)} executed successfully`, inline: false }
                     )
-                    .setTimestamp();
+                    .setTimestamp()
+                    .setFooter({ text: `${type.charAt(0).toUpperCase() + type.slice(1)} completed` });
 
-                await interaction.update({
+                await interaction.editReply({
                     embeds: [embed],
                     components: []
                 });
             } else {
-                // Re-add to pending approvals if execution failed
-                pendingApprovals.set(approvalId, approvalData);
-                await interaction.reply({
-                    content: `Failed to execute ${type}. The user may have left the server or an error occurred.`,
-                    ephemeral: true
+                const embed = new Discord.EmbedBuilder()
+                    .setTitle(`${type.toUpperCase()} APPROVAL FAILED ❌`)
+                    .setColor('#FF6600')
+                    .addFields(
+                        { name: 'Target User', value: `${approvalData.targetUsername} (${approvalData.targetTag})`, inline: true },
+                        { name: 'Requested By', value: approvalData.requesterTag, inline: true },
+                        { name: 'Attempted By', value: `${interaction.user.username}#${interaction.user.discriminator}`, inline: true },
+                        { name: 'Reason', value: approvalData.reason, inline: false },
+                        { name: 'Status', value: `❌ Failed to execute ${type}. User may have left the server or insufficient permissions.`, inline: false }
+                    )
+                    .setTimestamp()
+                    .setFooter({ text: 'Execution failed' });
+
+                await interaction.editReply({
+                    embeds: [embed],
+                    components: []
                 });
             }
         } else {
             // Decline the request
+            pendingApprovals.delete(approvalId);
+
             const embed = new Discord.EmbedBuilder()
-                .setTitle(`${type.toUpperCase()} REQUEST DECLINED`)
+                .setTitle(`${type.toUpperCase()} REQUEST DECLINED ❌`)
                 .setColor('#FF0000')
                 .addFields(
                     { name: 'Target User', value: `${approvalData.targetUsername} (${approvalData.targetTag})`, inline: true },
                     { name: 'Requested By', value: approvalData.requesterTag, inline: true },
                     { name: 'Declined By', value: `${interaction.user.username}#${interaction.user.discriminator}`, inline: true },
-                    { name: 'Reason', value: approvalData.reason, inline: false }
+                    { name: 'Reason', value: approvalData.reason, inline: false },
+                    { name: 'Status', value: `❌ Request declined by moderator`, inline: false }
                 )
-                .setTimestamp();
+                .setTimestamp()
+                .setFooter({ text: 'Request declined' });
 
-            await interaction.update({
+            await interaction.editReply({
                 embeds: [embed],
                 components: []
             });
@@ -170,17 +219,17 @@ async function handleApprovalInteraction(interaction) {
 
     } catch (error) {
         console.error('Error handling approval interaction:', error);
-        
-        // Re-add to pending approvals if there was an error
-        if (approvalData) {
-            pendingApprovals.set(approvalId, approvalData);
-        }
-        
+
         try {
             if (!interaction.replied && !interaction.deferred) {
                 await interaction.reply({
-                    content: 'An error occurred while processing your request.',
-                    ephemeral: true
+                    content: 'An error occurred while processing your request. Please try again.',
+                    flags: Discord.MessageFlags.Ephemeral
+                });
+            } else if (interaction.deferred) {
+                await interaction.editReply({
+                    content: 'An error occurred while processing your request. Please try again.',
+                    components: []
                 });
             }
         } catch (replyError) {
@@ -192,7 +241,7 @@ async function handleApprovalInteraction(interaction) {
 async function executeModeration(approvalData, approver) {
     try {
         const { guildId, type, targetId, reason, deleteMessages } = approvalData;
-        
+
         const guild = client.guilds.cache.get(guildId);
         if (!guild) {
             console.error(`Guild ${guildId} not found for moderation action`);

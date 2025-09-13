@@ -108,13 +108,13 @@ app.use(validateRequest);
 app.use((req, res, next) => {
     // Remove any HTTPS upgrade headers for HTTP deployment
     res.removeHeader('Strict-Transport-Security');
-    
+
     // Set proper protocol for HTTP deployment
     req.protocol = 'http';
     if (req.headers['x-forwarded-proto']) {
         req.headers['x-forwarded-proto'] = 'http';
     }
-    
+
     next();
 });
 
@@ -136,9 +136,9 @@ app.use(passport.session());
 
 // Middleware to track last visited page for authenticated users
 app.use((req, res, next) => {
-    if (req.isAuthenticated() && req.method === 'GET' && 
-        req.path.startsWith('/dashboard/') && 
-        !req.path.includes('/api/') && 
+    if (req.isAuthenticated() && req.method === 'GET' &&
+        req.path.startsWith('/dashboard/') &&
+        !req.path.includes('/api/') &&
         !req.xhr) {
         req.session.lastPage = req.originalUrl;
     }
@@ -156,7 +156,7 @@ app.get('/logout', (req, res) => {
     if (currentPage && currentPage.includes('/dashboard/')) {
         req.session.lastPage = currentPage.split(req.get('Host'))[1] || '/dashboard';
     }
-    
+
     req.logout((err) => {
         if (err) return next(err);
         res.redirect('/');
@@ -193,7 +193,7 @@ app.use('/api', apiRoutes);
 wss.on('connection', (ws, req) => {
     const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     console.log(`WebSocket client connected from ${clientIP}`);
-    
+
     // Set up ping interval for this connection
     const pingInterval = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -202,16 +202,16 @@ wss.on('connection', (ws, req) => {
             clearInterval(pingInterval);
         }
     }, 30000); // Ping every 30 seconds
-    
+
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
-            
+
             if (data.type === 'subscribe' && data.guildId) {
                 ws.guildId = data.guildId;
                 console.log(`WebSocket subscribed to guild: ${data.guildId}`);
             }
-            
+
             if (data.type === 'ping') {
                 // Respond to ping with pong
                 ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
@@ -220,12 +220,12 @@ wss.on('connection', (ws, req) => {
             console.error('Error parsing WebSocket message:', error);
         }
     });
-    
+
     ws.on('pong', () => {
         // Client responded to our ping
         ws.isAlive = true;
     });
-    
+
     ws.on('close', (code, reason) => {
         // Only log disconnects for unexpected closures
         if (code !== 1000 && code !== 1001) {
@@ -233,12 +233,12 @@ wss.on('connection', (ws, req) => {
         }
         clearInterval(pingInterval);
     });
-    
+
     ws.on('error', (error) => {
         console.error('WebSocket error:', error);
         clearInterval(pingInterval);
     });
-    
+
     // Set initial alive status
     ws.isAlive = true;
 });
@@ -250,7 +250,7 @@ setInterval(() => {
             console.log('Terminating dead WebSocket connection');
             return ws.terminate();
         }
-        
+
         ws.isAlive = false;
         ws.ping();
     });
@@ -338,6 +338,22 @@ client.on('shardDisconnect', (event, id) => {
 
 client.on('shardReconnecting', (id) => {
     console.log(`Shard ${id} is reconnecting...`);
+});
+
+client.once('ready', () => {
+    console.log(`Bot is ready! Logged in as ${client.user.tag}`);
+});
+
+// Handle button interactions for approval system
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+
+    // Check if this is an approval system interaction
+    const customId = interaction.customId;
+    if (customId.startsWith('approve_') || customId.startsWith('decline_')) {
+        const { handleApprovalInteraction } = require('./utils/approvalSystem');
+        await handleApprovalInteraction(interaction);
+    }
 });
 
 startApplication();

@@ -29,8 +29,8 @@ function broadcastToGuild(guildId, data) {
 
 // Health check endpoint
 router.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'ok', 
+    res.status(200).json({
+        status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: process.uptime()
     });
@@ -887,10 +887,10 @@ router.get('/dashboard/:guildId/roles', ensureRole, async (req, res) => {
     }
 });
 
-// Get guild members
+// Get guild members with infinite scroll support
 router.get('/dashboard/:guildId/members', ensureRole, async (req, res) => {
     const { guildId } = req.params;
-    const { page = 1, search = '', role = '', sort = 'newest', limit = 50 } = req.query;
+    const { page = 1, search = '', role = '', sort = 'newest', limit = 20, offset = 0 } = req.query;
 
     const userGuild = req.user.guilds.find(g => g.id === guildId);
     if (!userGuild) {
@@ -946,12 +946,11 @@ router.get('/dashboard/:guildId/members', ensureRole, async (req, res) => {
                 members.sort((a, b) => b.joinedTimestamp - a.joinedTimestamp);
         }
 
-        // Apply pagination
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
-        const offset = (pageNum - 1) * limitNum;
+        // Apply infinite scroll pagination
+        const limitNum = parseInt(limit) || 20;
+        const offsetNum = parseInt(offset) || 0;
         const totalMembers = members.length;
-        const paginatedMembers = members.slice(offset, offset + limitNum);
+        const paginatedMembers = members.slice(offsetNum, offsetNum + limitNum);
 
         const membersData = paginatedMembers.map(member => ({
             id: member.user.id,
@@ -972,15 +971,19 @@ router.get('/dashboard/:guildId/members', ensureRole, async (req, res) => {
             status: member.presence?.status || 'offline'
         }));
 
+        const hasMore = offsetNum + limitNum < totalMembers;
+
         res.json({
             success: true,
             members: membersData,
             pagination: {
-                current: pageNum,
-                total: Math.ceil(totalMembers / limitNum),
-                hasNext: offset + limitNum < totalMembers,
-                hasPrev: pageNum > 1,
-                totalMembers: totalMembers
+                current: Math.floor(offsetNum / limitNum) + 1,
+                totalMembers: totalMembers,
+                hasMore: hasMore,
+                hasPrev: offsetNum > 0,
+                offset: offsetNum,
+                limit: limitNum,
+                returned: membersData.length
             }
         });
     } catch (error) {

@@ -293,10 +293,13 @@ router.get('/:guildId/members', ensureRole, async (req, res) => {
             }))
         };
 
-        res.render('members', {
+        res.render('guild-dashboard', {
             user: req.user,
             guild: guildData,
+            config: await getOrCreateGuildConfig(guildId),
+            logs: [],
             members: membersData,
+            activeSection: 'members',
             pagination: {
                 current: parseInt(page),
                 total: Math.ceil(totalMembers / limit),
@@ -356,10 +359,13 @@ router.get('/:guildId/audit', ensureRole, async (req, res) => {
             name: guild.name
         };
 
-        res.render('audit-logs', {
+        res.render('guild-dashboard', {
             user: req.user,
             guild: guildData,
-            logs
+            config: await getOrCreateGuildConfig(guildId),
+            logs,
+            members: [],
+            activeSection: 'audit'
         });
     } catch (error) {
         console.error('Error fetching audit logs:', error);
