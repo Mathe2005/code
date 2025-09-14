@@ -313,116 +313,116 @@ function setupDiscordEvents(client, wss) {
         try {
             if (!interaction.isButton() && !interaction.isModalSubmit()) return;
 
-        // Handle approval system interactions
-        if (interaction.isButton() && (interaction.customId.startsWith('approve_') || interaction.customId.startsWith('decline_'))) {
-            const { handleApprovalInteraction } = require('../utils/approvalSystem');
-            return await handleApprovalInteraction(interaction);
-        }
-
-        if (interaction.isButton() && interaction.customId.startsWith('set_username_')) {
-            const userId = interaction.customId.split('_')[2];
-
-            // Check if the interaction user is the intended user
-            if (interaction.user.id !== userId) {
-                return interaction.reply({ content: 'ეს შენთვის არაა ბიძი!', flags: Discord.MessageFlags.Ephemeral });
+            // Handle approval system interactions
+            if (interaction.isButton() && (interaction.customId.startsWith('approve_') || interaction.customId.startsWith('decline_'))) {
+                const { handleApprovalInteraction } = require('../utils/approvalSystem');
+                return await handleApprovalInteraction(interaction);
             }
 
-            const modal = new Discord.ModalBuilder()
-                .setCustomId(`username_modal_${userId}`)
-                .setTitle('ჩაწერეთ თქვენი In Game სახელი');
+            if (interaction.isButton() && interaction.customId.startsWith('set_username_')) {
+                const userId = interaction.customId.split('_')[2];
 
-            const usernameInput = new Discord.TextInputBuilder()
-                .setCustomId('username_input')
-                .setLabel('აქ ჩაწერეთ მხოლოდ სახელი')
-                .setStyle(Discord.TextInputStyle.Short)
-                .setMinLength(1)
-                .setMaxLength(20)
-                .setPlaceholder('...')
-                .setRequired(true);
+                // Check if the interaction user is the intended user
+                if (interaction.user.id !== userId) {
+                    return interaction.reply({ content: 'ეს შენთვის არაა ბიძი!', flags: Discord.MessageFlags.Ephemeral });
+                }
 
-            const firstActionRow = new Discord.ActionRowBuilder().addComponents(usernameInput);
-            modal.addComponents(firstActionRow);
+                const modal = new Discord.ModalBuilder()
+                    .setCustomId(`username_modal_${userId}`)
+                    .setTitle('ჩაწერეთ თქვენი In Game სახელი');
 
-            await interaction.showModal(modal);
-        }
+                const usernameInput = new Discord.TextInputBuilder()
+                    .setCustomId('username_input')
+                    .setLabel('აქ ჩაწერეთ მხოლოდ სახელი')
+                    .setStyle(Discord.TextInputStyle.Short)
+                    .setMinLength(1)
+                    .setMaxLength(20)
+                    .setPlaceholder('...')
+                    .setRequired(true);
 
-        if (interaction.isModalSubmit() && interaction.customId.startsWith('username_modal_')) {
-            const userId = interaction.customId.split('_')[2];
+                const firstActionRow = new Discord.ActionRowBuilder().addComponents(usernameInput);
+                modal.addComponents(firstActionRow);
 
-            // Check if the interaction user is the intended user
-            if (interaction.user.id !== userId) {
-                return interaction.reply({ content: 'ეს შენთვის არაა ბიძი!', flags: Discord.MessageFlags.Ephemeral });
+                await interaction.showModal(modal);
             }
 
-            const username = interaction.fields.getTextInputValue('username_input');
+            if (interaction.isModalSubmit() && interaction.customId.startsWith('username_modal_')) {
+                const userId = interaction.customId.split('_')[2];
 
-            // Find the guild - if in DM, find the guild where the user has the configured role
-            let guild = interaction.guild;
-            let member = null;
+                // Check if the interaction user is the intended user
+                if (interaction.user.id !== userId) {
+                    return interaction.reply({ content: 'ეს შენთვის არაა ბიძი!', flags: Discord.MessageFlags.Ephemeral });
+                }
 
-            if (!guild) {
-                // If in DM, find the guild where this user has configured roles
-                for (const [guildId, cachedGuild] of interaction.client.guilds.cache) {
-                    const guildMember = cachedGuild.members.cache.get(userId);
-                    if (guildMember) {
-                        const { getOrCreateGuildConfig } = require('../utils/guildUtils');
-                        const config = await getOrCreateGuildConfig(guildId);
+                const username = interaction.fields.getTextInputValue('username_input');
 
-                        if (config && config.roleConfigs) {
-                            let roleConfigs = config.roleConfigs;
-                            if (typeof roleConfigs === 'string') {
-                                try {
-                                    roleConfigs = JSON.parse(roleConfigs);
-                                } catch (parseError) {
-                                    continue;
+                // Find the guild - if in DM, find the guild where the user has the configured role
+                let guild = interaction.guild;
+                let member = null;
+
+                if (!guild) {
+                    // If in DM, find the guild where this user has configured roles
+                    for (const [guildId, cachedGuild] of interaction.client.guilds.cache) {
+                        const guildMember = cachedGuild.members.cache.get(userId);
+                        if (guildMember) {
+                            const { getOrCreateGuildConfig } = require('../utils/guildUtils');
+                            const config = await getOrCreateGuildConfig(guildId);
+
+                            if (config && config.roleConfigs) {
+                                let roleConfigs = config.roleConfigs;
+                                if (typeof roleConfigs === 'string') {
+                                    try {
+                                        roleConfigs = JSON.parse(roleConfigs);
+                                    } catch (parseError) {
+                                        continue;
+                                    }
                                 }
-                            }
 
-                            if (Array.isArray(roleConfigs) && roleConfigs.length > 0) {
-                                // Check if user has any configured role in this guild
-                                const hasConfiguredRole = roleConfigs.some(roleConfig => {
-                                    if (!roleConfig.roleId) return false;
-                                    const hasSymbol = roleConfig.symbol && typeof roleConfig.symbol === 'string' && roleConfig.symbol.trim() !== '';
-                                    const hasSpecial = roleConfig.applySpecial === true || roleConfig.applySpecial === 'true' || roleConfig.applySpecial === 'Yes';
-                                    return (hasSymbol || hasSpecial) && guildMember.roles.cache.has(roleConfig.roleId);
-                                });
+                                if (Array.isArray(roleConfigs) && roleConfigs.length > 0) {
+                                    // Check if user has any configured role in this guild
+                                    const hasConfiguredRole = roleConfigs.some(roleConfig => {
+                                        if (!roleConfig.roleId) return false;
+                                        const hasSymbol = roleConfig.symbol && typeof roleConfig.symbol === 'string' && roleConfig.symbol.trim() !== '';
+                                        const hasSpecial = roleConfig.applySpecial === true || roleConfig.applySpecial === 'true' || roleConfig.applySpecial === 'Yes';
+                                        return (hasSymbol || hasSpecial) && guildMember.roles.cache.has(roleConfig.roleId);
+                                    });
 
-                                if (hasConfiguredRole) {
-                                    guild = cachedGuild;
-                                    member = guildMember;
-                                    break;
+                                    if (hasConfiguredRole) {
+                                        guild = cachedGuild;
+                                        member = guildMember;
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
+                } else {
+                    member = guild.members.cache.get(userId);
                 }
-            } else {
-                member = guild.members.cache.get(userId);
-            }
 
-            if (!guild || !member) {
-                return interaction.reply({ content: 'Error: Could not find your member information in any configured guild.', flags: Discord.MessageFlags.Ephemeral });
-            }
+                if (!guild || !member) {
+                    return interaction.reply({ content: 'Error: Could not find your member information in any configured guild.', flags: Discord.MessageFlags.Ephemeral });
+                }
 
-            try {
-                const { updateCustomNickname } = require('../utils/guildUtils');
-                await updateCustomNickname(member, username);
-
-                // Delete the original embed message if it exists
                 try {
-                    if (interaction.message && interaction.message.deletable) {
-                        await interaction.message.delete();
-                    }
-                } catch (deleteError) {
-                    console.log('Could not delete original embed message:', deleteError.message);
-                }
+                    const { updateCustomNickname } = require('../utils/guildUtils');
+                    await updateCustomNickname(member, username);
 
-                await interaction.reply({ content: `✅ Your in-game username has been set to: **${username}**`, flags: Discord.MessageFlags.Ephemeral });
-            } catch (error) {
-                console.error('Error updating custom nickname:', error);
-                await interaction.reply({ content: '❌ Failed to update your nickname. Please try again or contact an administrator.', flags: Discord.MessageFlags.Ephemeral });
+                    // Delete the original embed message if it exists
+                    try {
+                        if (interaction.message && interaction.message.deletable) {
+                            await interaction.message.delete();
+                        }
+                    } catch (deleteError) {
+                        console.log('Could not delete original embed message:', deleteError.message);
+                    }
+
+                    await interaction.reply({ content: `✅ Your in-game username has been set to: **${username}**`, flags: Discord.MessageFlags.Ephemeral });
+                } catch (error) {
+                    console.error('Error updating custom nickname:', error);
+                    await interaction.reply({ content: '❌ Failed to update your nickname. Please try again or contact an administrator.', flags: Discord.MessageFlags.Ephemeral });
+                }
             }
-        }
         } catch (error) {
             console.error('Error in interactionCreate event:', error);
             try {

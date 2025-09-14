@@ -916,19 +916,28 @@ router.get('/dashboard/:guildId/members', ensureRole, async (req, res) => {
         // Filter out bots first
         members = members.filter(member => !member.user.bot);
 
-        // Apply search filter
-        if (search) {
-            const searchTerm = search.toLowerCase();
-            members = members.filter(member =>
-                member.user.username.toLowerCase().includes(searchTerm) ||
-                member.user.tag.toLowerCase().includes(searchTerm) ||
-                (member.nickname && member.nickname.toLowerCase().includes(searchTerm))
-            );
+        // Apply search filter - ensure we handle the search parameter correctly
+        console.log('Search parameter received:', search, 'Type:', typeof search, 'Length:', search ? search.length : 0);
+        if (search && search.trim() !== '' && search !== 'undefined' && search !== 'null') {
+            const searchTerm = search.toLowerCase().trim();
+            console.log(`Applying search filter: "${searchTerm}"`);
+            members = members.filter(member => {
+                const username = member.user.username.toLowerCase();
+                const tag = member.user.tag.toLowerCase(); 
+                const nickname = member.nickname ? member.nickname.toLowerCase() : '';
+                
+                const matches = username.includes(searchTerm) || 
+                              tag.includes(searchTerm) || 
+                              nickname.includes(searchTerm);
+                              
+                return matches;
+            });
+            console.log(`Filtered members count after search: ${members.length}`);
         }
 
         // Apply role filter
-        if (role) {
-            members = members.filter(member => member.roles.cache.has(role));
+        if (role && role.trim() !== '' && role !== 'undefined' && role !== 'null') {
+            members = members.filter(member => member.roles.cache.has(role.trim()));
         }
 
         // Apply sorting
